@@ -1,0 +1,31 @@
+# PostgreSQL database
+
+Database: `grocery_store`
+
+## Run locally with pgAdmin
+
+1. Open Query Tool on `grocery_store`.
+2. If the tab is connected as `postgres`, run `SET ROLE grocery_app;` first.
+3. Open and execute `migrations/V1__create_schema.sql`.
+4. Open and execute `migrations/V2__seed_demo_data.sql`.
+5. Verify with:
+
+```sql
+SELECT current_database(), current_user;
+SELECT COUNT(*) FROM categories;
+SELECT COUNT(*) FROM products;
+SELECT COUNT(*) FROM customers;
+SELECT * FROM low_stock_products ORDER BY code;
+```
+
+Expected demo counts: 4 categories, 8 products, 6 customers.
+
+## JDBC configuration
+
+Use environment variables instead of committing passwords:
+
+```text
+DB_URL=jdbc:postgresql://localhost:5432/grocery_store
+DB_USER=grocery_app
+DB_PASSWORD=<your local password>
+```

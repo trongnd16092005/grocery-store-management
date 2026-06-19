@@ -13,13 +13,16 @@
 
         .pos-wrapper {
             display: flex;
-            height: calc(100vh - 65px); /* subtract topbar height */
+            flex: 1;
+            min-height: 0;
             overflow: hidden;
         }
 
         /* Product Grid Panel */
         .product-panel {
             flex: 1;
+            min-width: 0;
+            min-height: 0;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -104,10 +107,14 @@
         /* Cart Panel */
         .cart-panel {
             width: 360px;
+            min-height: 0;
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
             background: #fff;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scrollbar-gutter: stable;
         }
         .cart-header {
             padding: 14px 18px;
@@ -119,6 +126,7 @@
         }
         .cart-items {
             flex: 1;
+            min-height: 100px;
             overflow-y: auto;
             padding: 8px 0;
         }
@@ -176,10 +184,45 @@
             padding: 14px 18px;
             background: #f8fafc;
         }
+        .cart-panel::-webkit-scrollbar,
+        .cart-items::-webkit-scrollbar,
+        .product-grid::-webkit-scrollbar { width: 7px; }
+        .cart-panel::-webkit-scrollbar-thumb,
+        .cart-items::-webkit-scrollbar-thumb,
+        .product-grid::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 99px;
+        }
         .checkout-btn {
             font-size: 1.1rem; font-weight: 700;
             padding: 13px; border-radius: 10px;
             letter-spacing: 0.5px;
+        }
+        .payment-method {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .payment-option {
+            border: 1.5px solid #cbd5e1;
+            background: #fff;
+            color: #475569;
+            border-radius: 9px;
+            padding: 9px 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .payment-option.active {
+            border-color: #3b82f6;
+            background: #eff6ff;
+            color: #2563eb;
+        }
+        .qr-placeholder {
+            border: 1px dashed #93c5fd;
+            background: #eff6ff;
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
         }
     </style>
 </head>
@@ -190,9 +233,12 @@
     <div id="sidebar-placeholder"></div>
 
     <!-- MAIN CONTENT -->
-    <div class="main-content" style="overflow:hidden;">
-        <div class="topbar">
+    <div class="main-content" style="height:100vh; min-height:0; overflow:hidden;">
+        <div class="topbar d-flex justify-content-between align-items-center">
             <h1 class="h4 m-0 fw-bold">🛒 Màn Hình Bán Hàng (POS)</h1>
+            <button type="button" class="btn btn-primary" onclick="openQrPayment()">
+                <i class="fa-solid fa-qrcode me-2"></i>Thanh toán QR
+            </button>
         </div>
 
         <div class="pos-wrapper">
@@ -262,7 +308,33 @@
                         <span class="fw-bold fs-5 text-danger" id="totalAmount">0 đ</span>
                     </div>
 
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-muted mb-1" for="customerCodeInput">
+                            Mã khách hàng <span class="fw-normal">(không bắt buộc)</span>
+                        </label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white"><i class="fa-solid fa-user-tag text-muted"></i></span>
+                            <input type="text" id="customerCodeInput" class="form-control text-uppercase"
+                                placeholder="Ví dụ: KH001" oninput="onCustomerCodeInput(this)">
+                            <button class="btn btn-outline-primary" type="button" onclick="lookupCustomer()">Kiểm tra</button>
+                        </div>
+                        <div class="small mt-1 d-none" id="customerFeedback"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="small fw-semibold text-muted mb-2">Phương thức thanh toán</div>
+                        <div class="payment-method">
+                            <button type="button" class="payment-option active" id="cashMethodBtn" onclick="setPaymentMethod('cash')">
+                                <i class="fa-solid fa-money-bill-wave me-1"></i>Tiền mặt
+                            </button>
+                            <button type="button" class="payment-option" id="qrMethodBtn" onclick="setPaymentMethod('qr')">
+                                <i class="fa-solid fa-qrcode me-1"></i>Quét QR
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Cash Input -->
+                    <div id="cashPaymentPanel">
                     <div class="mb-2">
                         <label class="form-label small fw-semibold text-muted mb-1">
                             Tiền khách đưa (đ) <span class="text-danger">*</span>
@@ -277,6 +349,14 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <span class="text-muted small fw-semibold">Tiền thối lại:</span>
                         <span class="fw-bold text-success fs-5" id="changeAmount">0 đ</span>
+                    </div>
+                    </div>
+
+                    <div class="qr-placeholder mb-3 d-none" id="qrPaymentPanel">
+                        <i class="fa-solid fa-qrcode text-primary fs-1 mb-2"></i>
+                        <div class="fw-bold">Thanh toán QR</div>
+                        <div class="small text-muted">Khu vực tạo mã QR động sẽ được tích hợp ở giai đoạn backend.</div>
+                        <span class="badge text-bg-light border mt-2">Sẵn sàng phát triển sau</span>
                     </div>
 
                     <button class="btn btn-success w-100 checkout-btn" onclick="checkout()">
@@ -315,7 +395,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // ---- Load Sidebar ----
-fetch('common/sidebar.html')
+fetch('common/sidebar.html?v=3')
     .then(r => r.text())
     .then(html => {
         document.getElementById('sidebar-placeholder').outerHTML = html;
@@ -375,6 +455,59 @@ renderProducts(PRODUCTS);
 // ============================================================
 let cart = {}; // { id: { ...product, qty } }
 let cartTotal = 0;
+let paymentMethod = 'cash';
+let selectedCustomer = null;
+const CUSTOMERS = [
+    { code:'KH001', name:'Nguyễn Văn An', phone:'0901 234 567' },
+    { code:'KH002', name:'Trần Thị Bình', phone:'0912 345 678' },
+    { code:'KH003', name:'Lê Minh Châu', phone:'0987 654 321' },
+    { code:'KH004', name:'Phạm Hoàng Dũng', phone:'0933 456 789' }
+];
+
+function onCustomerCodeInput(el) {
+    el.value = el.value.toUpperCase().replace(/\s/g, '');
+    selectedCustomer = null;
+    el.classList.remove('is-valid', 'is-invalid');
+    document.getElementById('customerFeedback').classList.add('d-none');
+}
+
+function lookupCustomer() {
+    const input = document.getElementById('customerCodeInput');
+    const feedback = document.getElementById('customerFeedback');
+    const code = input.value.trim().toUpperCase();
+    selectedCustomer = CUSTOMERS.find(customer => customer.code === code) || null;
+
+    input.classList.remove('is-valid', 'is-invalid');
+    feedback.classList.remove('d-none', 'text-success', 'text-danger', 'text-muted');
+    if (!code) {
+        feedback.textContent = 'Để trống để thanh toán cho khách lẻ.';
+        feedback.classList.add('text-muted');
+        return;
+    }
+    if (selectedCustomer) {
+        input.classList.add('is-valid');
+        feedback.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i>${selectedCustomer.name} · ${selectedCustomer.phone}`;
+        feedback.classList.add('text-success');
+    } else {
+        input.classList.add('is-invalid');
+        feedback.textContent = 'Không tìm thấy mã khách hàng này.';
+        feedback.classList.add('text-danger');
+    }
+}
+
+function setPaymentMethod(method) {
+    paymentMethod = method;
+    document.getElementById('cashMethodBtn').classList.toggle('active', method === 'cash');
+    document.getElementById('qrMethodBtn').classList.toggle('active', method === 'qr');
+    document.getElementById('cashPaymentPanel').classList.toggle('d-none', method !== 'cash');
+    document.getElementById('qrPaymentPanel').classList.toggle('d-none', method !== 'qr');
+    document.getElementById('cashInput').classList.remove('is-invalid');
+}
+
+function openQrPayment() {
+    setPaymentMethod('qr');
+    document.getElementById('qrPaymentPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 
 function addToCart(id) {
     const p = PRODUCTS.find(x => x.id === id);
@@ -410,6 +543,10 @@ function clearCart() {
     document.getElementById('cashInput').value = '';
     document.getElementById('cashInput').classList.remove('is-invalid');
     document.getElementById('changeAmount').textContent = '0 đ';
+    selectedCustomer = null;
+    document.getElementById('customerCodeInput').value = '';
+    document.getElementById('customerCodeInput').classList.remove('is-valid', 'is-invalid');
+    document.getElementById('customerFeedback').classList.add('d-none');
 }
 
 function renderCart() {
@@ -471,6 +608,24 @@ function checkout() {
     if (Object.keys(cart).length === 0) {
         alert('Giỏ hàng đang trống! Vui lòng chọn sản phẩm trước khi thanh toán.'); return;
     }
+    const customerCode = document.getElementById('customerCodeInput').value.trim();
+    if (customerCode && !selectedCustomer) {
+        lookupCustomer();
+        if (!selectedCustomer) return;
+    }
+    const customerText = selectedCustomer
+        ? `<br>Khách hàng: <strong>${selectedCustomer.name} (${selectedCustomer.code})</strong>`
+        : '<br>Khách hàng: <strong>Khách lẻ</strong>';
+
+    if (paymentMethod === 'qr') {
+        document.getElementById('successMsg').innerHTML =
+            `Tổng hóa đơn: <strong class="text-danger">${fmt(cartTotal)}</strong><br>
+             Phương thức: <strong>QR (giao diện mô phỏng)</strong>${customerText}`;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('successModal')).show();
+        clearCart();
+        return;
+    }
+
     const cashRaw = document.getElementById('cashInput').value.replace(/\D/g,'');
     const cash = parseInt(cashRaw) || 0;
     const cashEl = document.getElementById('cashInput');
@@ -484,7 +639,7 @@ function checkout() {
     document.getElementById('successMsg').innerHTML =
         `Tổng hóa đơn: <strong class="text-danger">${fmt(cartTotal)}</strong> &nbsp;|&nbsp;
          Tiền khách trả: <strong>${fmt(cash)}</strong> &nbsp;|&nbsp;
-         Tiền thối lại: <strong class="text-success">${fmt(change)}</strong>`;
+         Tiền thối lại: <strong class="text-success">${fmt(change)}</strong>${customerText}`;
 
     bootstrap.Modal.getOrCreateInstance(document.getElementById('successModal')).show();
     clearCart();

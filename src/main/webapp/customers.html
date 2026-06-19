@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Khách Hàng - Cửa Hàng Bán Lẻ</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        .customer-stat { border: 0; border-radius: 14px; box-shadow: 0 1px 4px rgba(15,23,42,.06); }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: #dbeafe; color: #2563eb; flex: 0 0 auto; }
+        .customer-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+        .empty-state { padding: 52px 16px; text-align: center; color: #94a3b8; }
+    </style>
+</head>
+<body>
+<div class="container-fluid p-0 d-flex">
+    <div id="sidebar-placeholder"></div>
+    <main class="main-content">
+        <div class="topbar d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div><h1 class="h4 m-0 fw-bold">👥 Quản Lý Khách Hàng</h1><div class="small text-muted mt-1">Lưu thông tin và theo dõi lịch sử mua hàng</div></div>
+            <button class="btn btn-primary" onclick="openAddCustomer()"><i class="fa-solid fa-user-plus me-2"></i>Thêm khách hàng</button>
+        </div>
+
+        <div class="content">
+            <div class="row g-3 mb-4">
+                <div class="col-sm-6 col-xl-3"><div class="card customer-stat"><div class="card-body"><div class="text-muted small">Tổng khách hàng</div><div class="fs-3 fw-bold" id="customerCount">6</div></div></div></div>
+                <div class="col-sm-6 col-xl-3"><div class="card customer-stat"><div class="card-body"><div class="text-muted small">Khách mới tháng này</div><div class="fs-3 fw-bold text-primary">+2</div></div></div></div>
+                <div class="col-sm-6 col-xl-3"><div class="card customer-stat"><div class="card-body"><div class="text-muted small">Khách thân thiết</div><div class="fs-3 fw-bold text-success" id="vipCount">2</div></div></div></div>
+                <div class="col-sm-6 col-xl-3"><div class="card customer-stat"><div class="card-body"><div class="text-muted small">Tổng lượt mua</div><div class="fs-3 fw-bold">47</div></div></div></div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-body border-bottom py-3">
+                    <div class="row g-2">
+                        <div class="col-lg-6"><div class="input-group"><span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span><input id="customerSearch" class="form-control border-start-0" placeholder="Tìm theo mã, tên hoặc số điện thoại..." oninput="renderCustomers()"></div></div>
+                        <div class="col-sm-6 col-lg-3"><select id="customerType" class="form-select" onchange="renderCustomers()"><option value="">Tất cả nhóm khách</option><option value="Thân thiết">Thân thiết</option><option value="Thường">Khách thường</option></select></div>
+                        <div class="col-sm-6 col-lg-3"><button class="btn btn-light border w-100" onclick="resetCustomerFilters()"><i class="fa-solid fa-rotate-left me-2"></i>Xóa bộ lọc</button></div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light"><tr><th class="ps-4 py-3">Khách hàng</th><th>Mã KH</th><th>Liên hệ</th><th>Nhóm</th><th class="text-center">Lượt mua</th><th>Tổng chi tiêu</th><th>Lần mua cuối</th><th class="text-end pe-4">Thao tác</th></tr></thead>
+                        <tbody id="customerBody"></tbody>
+                    </table>
+                </div>
+                <div class="card-footer bg-white border-0 py-3 small text-muted" id="customerInfo"></div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div class="modal fade" id="customerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow"><form onsubmit="saveCustomer(event)">
+        <div class="modal-header"><div><h5 class="modal-title fw-bold" id="customerModalTitle">Thêm khách hàng</h5><small class="text-muted">Mã khách hàng được tạo tự động</small></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <input type="hidden" id="editingCustomerCode">
+            <div class="mb-3"><label class="form-label fw-semibold" for="customerName">Họ và tên <span class="text-danger">*</span></label><input class="form-control" id="customerName" placeholder="Ví dụ: Nguyễn Văn An" required></div>
+            <div class="row g-3"><div class="col-sm-6"><label class="form-label fw-semibold" for="customerPhone">Số điện thoại <span class="text-danger">*</span></label><input class="form-control" id="customerPhone" inputmode="tel" placeholder="09xx xxx xxx" required></div><div class="col-sm-6"><label class="form-label fw-semibold" for="customerGender">Giới tính</label><select class="form-select" id="customerGender"><option>Nam</option><option>Nữ</option><option>Khác</option></select></div></div>
+            <div class="mt-3"><label class="form-label fw-semibold" for="customerEmail">Email</label><input type="email" class="form-control" id="customerEmail" placeholder="email@example.com"></div>
+            <div class="mt-3"><label class="form-label fw-semibold" for="customerAddress">Địa chỉ</label><textarea class="form-control" id="customerAddress" rows="2" placeholder="Địa chỉ khách hàng..."></textarea></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button><button class="btn btn-primary"><i class="fa-solid fa-floppy-disk me-2"></i>Lưu khách hàng</button></div>
+    </form></div></div>
+</div>
+
+<div class="modal fade" id="customerDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content border-0 shadow">
+        <div class="modal-header"><div><h5 class="modal-title fw-bold" id="detailCustomerName"></h5><span class="badge bg-primary-subtle text-primary customer-code" id="detailCustomerCode"></span></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="row g-3 mb-4"><div class="col-sm-4"><div class="p-3 bg-light rounded"><div class="small text-muted">Số điện thoại</div><div class="fw-semibold" id="detailPhone"></div></div></div><div class="col-sm-4"><div class="p-3 bg-light rounded"><div class="small text-muted">Lượt mua</div><div class="fw-semibold" id="detailOrders"></div></div></div><div class="col-sm-4"><div class="p-3 bg-light rounded"><div class="small text-muted">Tổng chi tiêu</div><div class="fw-semibold text-danger" id="detailSpent"></div></div></div></div>
+            <h6 class="fw-bold">Lịch sử mua gần đây</h6>
+            <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Mã hóa đơn</th><th>Ngày mua</th><th class="text-end">Tổng tiền</th><th>Trạng thái</th></tr></thead><tbody id="detailOrdersBody"></tbody></table></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button></div>
+    </div></div>
+</div>
+
+<div class="toast-container position-fixed top-0 end-0 p-3"><div class="toast border-0 shadow" id="customerToast"><div class="toast-header bg-success text-white"><i class="fa-solid fa-circle-check me-2"></i><strong class="me-auto">Thành công</strong><button class="btn-close btn-close-white" data-bs-dismiss="toast"></button></div><div class="toast-body" id="customerToastText"></div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+fetch('common/sidebar.html?v=3').then(r => r.text()).then(html => {
+    document.getElementById('sidebar-placeholder').outerHTML = html;
+    document.querySelector('.sidebar-nav a[href="customers.html"]')?.classList.add('active');
+});
+
+let CUSTOMERS = [
+    {code:'KH001',name:'Nguyễn Văn An',phone:'0901 234 567',email:'an.nguyen@email.com',gender:'Nam',address:'Quận 1, TP.HCM',type:'Thân thiết',orders:12,spent:2450000,last:'18/06/2026'},
+    {code:'KH002',name:'Trần Thị Bình',phone:'0912 345 678',email:'binh.tran@email.com',gender:'Nữ',address:'Quận 3, TP.HCM',type:'Thân thiết',orders:10,spent:1860000,last:'18/06/2026'},
+    {code:'KH003',name:'Lê Minh Châu',phone:'0987 654 321',email:'',gender:'Nam',address:'Quận Bình Thạnh, TP.HCM',type:'Thường',orders:7,spent:920000,last:'17/06/2026'},
+    {code:'KH004',name:'Phạm Hoàng Dũng',phone:'0933 456 789',email:'',gender:'Nam',address:'TP. Thủ Đức, TP.HCM',type:'Thường',orders:6,spent:710000,last:'15/06/2026'},
+    {code:'KH005',name:'Võ Ngọc Hà',phone:'0908 111 222',email:'ha.vo@email.com',gender:'Nữ',address:'Quận 7, TP.HCM',type:'Thường',orders:8,spent:1130000,last:'14/06/2026'},
+    {code:'KH006',name:'Đặng Thu Lan',phone:'0977 888 999',email:'',gender:'Nữ',address:'Quận Tân Bình, TP.HCM',type:'Thường',orders:4,spent:430000,last:'10/06/2026'}
+];
+const fmtMoney = value => new Intl.NumberFormat('vi-VN').format(value) + ' đ';
+const initials = name => name.split(' ').slice(-2).map(part => part[0]).join('').toUpperCase();
+
+function renderCustomers() {
+    const q=document.getElementById('customerSearch').value.trim().toLowerCase();
+    const type=document.getElementById('customerType').value;
+    const rows=CUSTOMERS.filter(c=>(!q||c.code.toLowerCase().includes(q)||c.name.toLowerCase().includes(q)||c.phone.replace(/\s/g,'').includes(q.replace(/\s/g,'')))&&(!type||c.type===type));
+    document.getElementById('customerBody').innerHTML=rows.length?rows.map(c=>`<tr><td class="ps-4"><div class="d-flex align-items-center gap-2"><div class="avatar">${initials(c.name)}</div><div><div class="fw-semibold">${c.name}</div><small class="text-muted">${c.email||'Chưa có email'}</small></div></div></td><td><span class="badge bg-light text-dark border customer-code">${c.code}</span></td><td>${c.phone}</td><td><span class="badge ${c.type==='Thân thiết'?'bg-success-subtle text-success':'bg-secondary-subtle text-secondary'}">${c.type}</span></td><td class="text-center fw-semibold">${c.orders}</td><td class="fw-semibold">${fmtMoney(c.spent)}</td><td class="text-muted small">${c.last}</td><td class="text-end pe-4"><button class="btn btn-sm btn-outline-primary me-1" onclick="showCustomer('${c.code}')"><i class="fa-solid fa-eye"></i><span class="visually-hidden">Xem chi tiết</span></button><button class="btn btn-sm btn-outline-secondary" onclick="editCustomer('${c.code}')"><i class="fa-solid fa-pen"></i><span class="visually-hidden">Sửa</span></button></td></tr>`).join(''):'<tr><td colspan="8"><div class="empty-state"><i class="fa-solid fa-user-slash fs-2 mb-2"></i><div>Không tìm thấy khách hàng phù hợp</div></div></td></tr>';
+    document.getElementById('customerInfo').textContent=`Hiển thị ${rows.length} / ${CUSTOMERS.length} khách hàng`;
+    document.getElementById('customerCount').textContent=CUSTOMERS.length;
+    document.getElementById('vipCount').textContent=CUSTOMERS.filter(c=>c.type==='Thân thiết').length;
+}
+function resetCustomerFilters(){document.getElementById('customerSearch').value='';document.getElementById('customerType').value='';renderCustomers();}
+function openAddCustomer(){document.querySelector('#customerModal form').reset();document.getElementById('editingCustomerCode').value='';document.getElementById('customerModalTitle').textContent='Thêm khách hàng';bootstrap.Modal.getOrCreateInstance(document.getElementById('customerModal')).show();}
+function editCustomer(code){const c=CUSTOMERS.find(x=>x.code===code);if(!c)return;document.getElementById('editingCustomerCode').value=c.code;document.getElementById('customerName').value=c.name;document.getElementById('customerPhone').value=c.phone;document.getElementById('customerGender').value=c.gender;document.getElementById('customerEmail').value=c.email;document.getElementById('customerAddress').value=c.address;document.getElementById('customerModalTitle').textContent=`Sửa khách hàng ${c.code}`;bootstrap.Modal.getOrCreateInstance(document.getElementById('customerModal')).show();}
+function saveCustomer(e){e.preventDefault();const editCode=document.getElementById('editingCustomerCode').value;const data={name:document.getElementById('customerName').value.trim(),phone:document.getElementById('customerPhone').value.trim(),gender:document.getElementById('customerGender').value,email:document.getElementById('customerEmail').value.trim(),address:document.getElementById('customerAddress').value.trim()};if(editCode){Object.assign(CUSTOMERS.find(c=>c.code===editCode),data);}else{const max=Math.max(...CUSTOMERS.map(c=>+c.code.replace('KH','')));CUSTOMERS.push({code:'KH'+String(max+1).padStart(3,'0'),...data,type:'Thường',orders:0,spent:0,last:'Chưa mua hàng'});}renderCustomers();bootstrap.Modal.getInstance(document.getElementById('customerModal')).hide();document.getElementById('customerToastText').textContent=editCode?'Đã cập nhật thông tin khách hàng.':'Đã thêm khách hàng mới.';bootstrap.Toast.getOrCreateInstance(document.getElementById('customerToast')).show();}
+function showCustomer(code){const c=CUSTOMERS.find(x=>x.code===code);if(!c)return;document.getElementById('detailCustomerName').textContent=c.name;document.getElementById('detailCustomerCode').textContent=c.code;document.getElementById('detailPhone').textContent=c.phone;document.getElementById('detailOrders').textContent=`${c.orders} hóa đơn`;document.getElementById('detailSpent').textContent=fmtMoney(c.spent);const samples=[['HD006','18/06/2026',83000],['HD002','12/06/2026',68000],['HD001','05/06/2026',55000]];document.getElementById('detailOrdersBody').innerHTML=c.orders?samples.slice(0,Math.min(3,c.orders)).map(o=>`<tr><td><strong>${o[0]}</strong></td><td>${o[1]}</td><td class="text-end">${fmtMoney(o[2])}</td><td><span class="badge bg-success">Đã thanh toán</span></td></tr>`).join(''):'<tr><td colspan="4" class="text-center text-muted py-4">Khách hàng chưa có giao dịch</td></tr>';bootstrap.Modal.getOrCreateInstance(document.getElementById('customerDetailModal')).show();}
+renderCustomers();
+</script>
+</body>
+</html>
