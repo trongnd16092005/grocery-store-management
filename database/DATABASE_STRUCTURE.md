@@ -207,3 +207,4 @@ Completing a purchase order follows the same pattern, but increases stock and cr
 
 - Schema migration: `database/migrations/V1__create_schema.sql`
 - Demo data: `database/migrations/V2__seed_demo_data.sql`
+- Business-code sequences: `database/migrations/V3__business_code_sequences.sql`

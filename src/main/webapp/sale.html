@@ -395,7 +395,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // ---- Load Sidebar ----
-fetch('common/sidebar.html?v=3')
+fetch('common/sidebar.html?v=4')
     .then(r => r.text())
     .then(html => {
         document.getElementById('sidebar-placeholder').outerHTML = html;
@@ -457,12 +457,6 @@ let cart = {}; // { id: { ...product, qty } }
 let cartTotal = 0;
 let paymentMethod = 'cash';
 let selectedCustomer = null;
-const CUSTOMERS = [
-    { code:'KH001', name:'Nguyễn Văn An', phone:'0901 234 567' },
-    { code:'KH002', name:'Trần Thị Bình', phone:'0912 345 678' },
-    { code:'KH003', name:'Lê Minh Châu', phone:'0987 654 321' },
-    { code:'KH004', name:'Phạm Hoàng Dũng', phone:'0933 456 789' }
-];
 
 function onCustomerCodeInput(el) {
     el.value = el.value.toUpperCase().replace(/\s/g, '');
@@ -471,27 +465,39 @@ function onCustomerCodeInput(el) {
     document.getElementById('customerFeedback').classList.add('d-none');
 }
 
-function lookupCustomer() {
+async function lookupCustomer() {
     const input = document.getElementById('customerCodeInput');
     const feedback = document.getElementById('customerFeedback');
     const code = input.value.trim().toUpperCase();
-    selectedCustomer = CUSTOMERS.find(customer => customer.code === code) || null;
-
+    selectedCustomer = null;
     input.classList.remove('is-valid', 'is-invalid');
     feedback.classList.remove('d-none', 'text-success', 'text-danger', 'text-muted');
     if (!code) {
         feedback.textContent = 'Để trống để thanh toán cho khách lẻ.';
         feedback.classList.add('text-muted');
-        return;
+        return true;
     }
-    if (selectedCustomer) {
+
+    try {
+        const response = await fetch(`api/customers/lookup?code=${encodeURIComponent(code)}`);
+        if (!response.ok) throw new Error('Lookup failed');
+        const data = await response.json();
+        if (!data.found) {
+            input.classList.add('is-invalid');
+            feedback.textContent = 'Không tìm thấy mã khách hàng này.';
+            feedback.classList.add('text-danger');
+            return false;
+        }
+        selectedCustomer = data;
         input.classList.add('is-valid');
-        feedback.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i>${selectedCustomer.name} · ${selectedCustomer.phone}`;
+        feedback.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i>${data.name} · ${data.phone}`;
         feedback.classList.add('text-success');
-    } else {
+        return true;
+    } catch (error) {
         input.classList.add('is-invalid');
-        feedback.textContent = 'Không tìm thấy mã khách hàng này.';
+        feedback.textContent = 'Không thể kết nối dịch vụ khách hàng. Hãy chạy ứng dụng Java Web.';
         feedback.classList.add('text-danger');
+        return false;
     }
 }
 
@@ -604,14 +610,14 @@ function onCashInput(el) {
 // ============================================================
 //  CHECKOUT
 // ============================================================
-function checkout() {
+async function checkout() {
     if (Object.keys(cart).length === 0) {
         alert('Giỏ hàng đang trống! Vui lòng chọn sản phẩm trước khi thanh toán.'); return;
     }
     const customerCode = document.getElementById('customerCodeInput').value.trim();
     if (customerCode && !selectedCustomer) {
-        lookupCustomer();
-        if (!selectedCustomer) return;
+        const found = await lookupCustomer();
+        if (!found) return;
     }
     const customerText = selectedCustomer
         ? `<br>Khách hàng: <strong>${selectedCustomer.name} (${selectedCustomer.code})</strong>`

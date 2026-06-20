@@ -8,7 +8,8 @@ Database: `grocery_store`
 2. If the tab is connected as `postgres`, run `SET ROLE grocery_app;` first.
 3. Open and execute `migrations/V1__create_schema.sql`.
 4. Open and execute `migrations/V2__seed_demo_data.sql`.
-5. Verify with:
+5. Open and execute `migrations/V3__business_code_sequences.sql`.
+6. Verify with:
 
 ```sql
 SELECT current_database(), current_user;
