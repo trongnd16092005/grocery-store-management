@@ -9,6 +9,8 @@ public class Invoice extends BaseEntity {
     private String code;
     private Long customerId;
     private Long cashierId;
+    private String customerName;
+    private String cashierName;
     private PaymentMethod paymentMethod;
     private InvoiceStatus status = InvoiceStatus.PAID;
     private BigDecimal subtotal = BigDecimal.ZERO;
@@ -44,6 +46,11 @@ public class Invoice extends BaseEntity {
     public void setCashierId(Long cashierId) {
         this.cashierId = cashierId;
     }
+
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+    public String getCashierName() { return cashierName; }
+    public void setCashierName(String cashierName) { this.cashierName = cashierName; }
 
     public PaymentMethod getPaymentMethod() {
         return paymentMethod;

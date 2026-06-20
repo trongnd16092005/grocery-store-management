@@ -404,18 +404,9 @@ fetch('common/sidebar.html?v=4')
     });
 
 // ============================================================
-//  PRODUCT DATA (Mock – replace with backend API later)
+//  PRODUCT DATA (loaded from PostgreSQL through Java Web)
 // ============================================================
-const PRODUCTS = [
-    { id:'SP001', name:'Coca Cola 320ml',         cat:'Nước ngọt', price:10000, stock:120, icon:'fa-bottle-water',   iconColor:'text-primary',   bgColor:'bg-primary-subtle'   },
-    { id:'SP002', name:'Bánh Quy Cosy 200g',      cat:'Bánh kẹo',  price:35000, stock:8,   icon:'fa-cookie-bite',    iconColor:'text-warning',   bgColor:'bg-warning-subtle'   },
-    { id:'SP003', name:'Mì Hảo Hảo Tôm Chua Cay',cat:'Mì ăn liền',price:4500,  stock:0,   icon:'fa-bowl-food',      iconColor:'text-danger',    bgColor:'bg-danger-subtle'    },
-    { id:'SP004', name:'Aquafina 500ml',           cat:'Nước ngọt', price:6000,  stock:85,  icon:'fa-droplet',        iconColor:'text-info',      bgColor:'bg-info-subtle'      },
-    { id:'SP005', name:'Kẹo dẻo Haribo 80g',      cat:'Bánh kẹo',  price:22000, stock:4,   icon:'fa-candy-cane',     iconColor:'text-success',   bgColor:'bg-success-subtle'   },
-    { id:'SP006', name:'Nước mắm Chinsu 500ml',   cat:'Gia vị',    price:45000, stock:30,  icon:'fa-fish',           iconColor:'text-secondary', bgColor:'bg-secondary-subtle' },
-    { id:'SP007', name:'Hạt nêm Knorr 400g',      cat:'Gia vị',    price:38000, stock:50,  icon:'fa-pepper-hot',     iconColor:'text-dark',      bgColor:'bg-light'            },
-    { id:'SP008', name:'Pepsi Lon 330ml',          cat:'Nước ngọt', price:9500,  stock:60,  icon:'fa-bottle-water',   iconColor:'text-primary',   bgColor:'bg-primary-subtle'   },
-];
+let PRODUCTS = [];
 
 // ============================================================
 //  RENDER PRODUCTS
@@ -423,6 +414,8 @@ const PRODUCTS = [
 function renderProducts(list) {
     const grid = document.getElementById('productGrid');
     grid.innerHTML = list.map(p => {
+        const safeName = escapeHtml(p.name);
+        const safeCat = escapeHtml(p.cat);
         const outOfStock = p.stock <= 0;
         const stockBadge = outOfStock
             ? '<span class="badge bg-danger" style="font-size:10px;">Hết hàng</span>'
@@ -431,15 +424,15 @@ function renderProducts(list) {
                 : `<span class="badge bg-success" style="font-size:10px;">Kho: ${p.stock}</span>`;
         return `
         <div class="product-card ${outOfStock ? 'out-of-stock' : ''}"
-             data-id="${p.id}" data-cat="${p.cat}"
-             data-name="${p.name.toLowerCase()}"
+             data-id="${p.id}" data-cat="${safeCat}"
+             data-name="${safeName.toLowerCase()}"
              onclick="${outOfStock ? '' : `addToCart('${p.id}')`}">
-            <div class="icon-area ${p.bgColor} ${p.iconColor}">
-                <i class="fa-solid ${p.icon}"></i>
+            <div class="icon-area bg-primary-subtle text-primary">
+                <i class="fa-solid fa-box"></i>
             </div>
             <div class="card-info">
-                <div class="cat-label">${p.cat}</div>
-                <div class="prod-name" title="${p.name}">${p.name}</div>
+                <div class="cat-label">${safeCat}</div>
+                <div class="prod-name" title="${safeName}">${safeName}</div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="prod-price">${fmt(p.price)}</span>
                     ${stockBadge}
@@ -448,7 +441,17 @@ function renderProducts(list) {
         </div>`;
     }).join('');
 }
-renderProducts(PRODUCTS);
+async function loadProducts() {
+    try {
+        const response = await fetch('api/products/sale');
+        if (!response.ok) throw new Error('Không tải được sản phẩm.');
+        PRODUCTS = await response.json(); renderProducts(PRODUCTS);
+        const categories = [...new Set(PRODUCTS.map(p => p.cat))];
+        const select = document.getElementById('categoryFilter');
+        select.innerHTML = '<option value="">Tất cả danh mục</option>' + categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    } catch (e) { document.getElementById('productGrid').innerHTML = `<div class="alert alert-danger">${escapeHtml(e.message)}</div>`; }
+}
+loadProducts();
 
 // ============================================================
 //  CART STATE
@@ -566,10 +569,11 @@ function renderCart() {
     document.getElementById('cartItems').innerHTML = keys.map(id => {
         const item = cart[id];
         const sub = item.price * item.qty;
+        const safeItemName = escapeHtml(item.name);
         return `
         <div class="cart-item">
             <div class="item-info">
-                <div class="item-name" title="${item.name}">${item.name}</div>
+                <div class="item-name" title="${safeItemName}">${safeItemName}</div>
                 <div class="item-price">${fmt(item.price)} / cái</div>
             </div>
             <div class="qty-ctrl">
@@ -619,37 +623,26 @@ async function checkout() {
         const found = await lookupCustomer();
         if (!found) return;
     }
-    const customerText = selectedCustomer
-        ? `<br>Khách hàng: <strong>${selectedCustomer.name} (${selectedCustomer.code})</strong>`
-        : '<br>Khách hàng: <strong>Khách lẻ</strong>';
-
-    if (paymentMethod === 'qr') {
-        document.getElementById('successMsg').innerHTML =
-            `Tổng hóa đơn: <strong class="text-danger">${fmt(cartTotal)}</strong><br>
-             Phương thức: <strong>QR (giao diện mô phỏng)</strong>${customerText}`;
-        bootstrap.Modal.getOrCreateInstance(document.getElementById('successModal')).show();
-        clearCart();
-        return;
-    }
-
     const cashRaw = document.getElementById('cashInput').value.replace(/\D/g,'');
     const cash = parseInt(cashRaw) || 0;
     const cashEl = document.getElementById('cashInput');
-
-    if (!cashRaw || cash < cartTotal) {
+    if (paymentMethod === 'cash' && (!cashRaw || cash < cartTotal)) {
         cashEl.classList.add('is-invalid'); return;
     }
     cashEl.classList.remove('is-invalid');
-
-    const change = cash - cartTotal;
-    document.getElementById('successMsg').innerHTML =
-        `Tổng hóa đơn: <strong class="text-danger">${fmt(cartTotal)}</strong> &nbsp;|&nbsp;
-         Tiền khách trả: <strong>${fmt(cash)}</strong> &nbsp;|&nbsp;
-         Tiền thối lại: <strong class="text-success">${fmt(change)}</strong>${customerText}`;
-
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('successModal')).show();
-    clearCart();
-    cashEl.value = '';
+    const body = new URLSearchParams();
+    Object.values(cart).forEach(item => { body.append('productCode', item.id); body.append('quantity', item.qty); });
+    body.set('customerCode', customerCode); body.set('paymentMethod', paymentMethod.toUpperCase());
+    if (paymentMethod === 'cash') body.set('cashReceived', cash);
+    const button = document.querySelector('.checkout-btn'); button.disabled = true;
+    try {
+        const response = await fetch('api/checkout', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}, body});
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Thanh toán thất bại.');
+        document.getElementById('successMsg').innerHTML = `Hóa đơn <strong>${result.code}</strong> đã được lưu.<br>Tổng tiền: <strong class="text-danger">${fmt(result.total)}</strong>${result.change == null ? '' : `<br>Tiền thối: <strong class="text-success">${fmt(result.change)}</strong>`}`;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('successModal')).show(); clearCart(); cashEl.value=''; await loadProducts();
+    } catch (error) { alert(error.message); }
+    finally { button.disabled = false; }
 }
 
 // ============================================================
@@ -669,6 +662,7 @@ function filterProducts() {
 //  HELPERS
 // ============================================================
 function fmt(n) { return new Intl.NumberFormat('vi-VN').format(n) + ' đ'; }
+function escapeHtml(value) { const el=document.createElement('div'); el.textContent=value??''; return el.innerHTML; }
 </script>
 </body>
 </html>
