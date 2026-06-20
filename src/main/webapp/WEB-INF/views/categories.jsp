@@ -24,7 +24,7 @@
                     <div class="card border-0 shadow-sm">
                         <div class="card-body p-4">
                             <h5 class="fw-bold mb-3">${empty editingCategory ? 'Thêm danh mục' : 'Sửa danh mục'}</h5>
-                            <form method="post" action="${pageContext.request.contextPath}/categories">
+                            <form method="post" action="${pageContext.request.contextPath}/categories"><input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
                                 <input type="hidden" name="action" value="save">
                                 <input type="hidden" name="id" value="${editingCategory.id}">
                                 <div class="mb-3">
@@ -66,7 +66,7 @@
                                         <td class="text-center"><span class="badge bg-primary rounded-pill">${category.productCount}</span></td>
                                         <td class="text-end pe-4">
                                             <a class="btn btn-sm btn-outline-primary" href="${pageContext.request.contextPath}/categories?editId=${category.id}"><i class="fa-solid fa-pen"></i></a>
-                                            <form method="post" action="${pageContext.request.contextPath}/categories" class="d-inline" onsubmit="return confirm('Xóa danh mục này?')">
+                                            <form method="post" action="${pageContext.request.contextPath}/categories" class="d-inline" onsubmit="return confirm('Xóa danh mục này?')"><input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
                                                 <input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="${category.id}">
                                                 <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
                                             </form>
@@ -86,7 +86,7 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-fetch('${pageContext.request.contextPath}/common/sidebar.html?v=4').then(r=>r.text()).then(html=>{document.getElementById('sidebar-placeholder').outerHTML=html;document.querySelector('.sidebar-nav a[href="categories"]')?.classList.add('active');});
+fetch('${pageContext.request.contextPath}/common/sidebar').then(r=>r.text()).then(html=>{document.getElementById('sidebar-placeholder').outerHTML=html;document.querySelector('.sidebar-nav a[href$="/categories"]')?.classList.add('active');});
 </script>
 </body>
 </html>

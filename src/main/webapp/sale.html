@@ -395,11 +395,11 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // ---- Load Sidebar ----
-fetch('common/sidebar.html?v=4')
+fetch('common/sidebar')
     .then(r => r.text())
     .then(html => {
         document.getElementById('sidebar-placeholder').outerHTML = html;
-        const link = document.querySelector('.sidebar-nav a[href="sale.html"]');
+        const link = document.querySelector('.sidebar-nav a[href$="/sale.html"]');
         if (link) link.classList.add('active');
     });
 
@@ -460,6 +460,15 @@ let cart = {}; // { id: { ...product, qty } }
 let cartTotal = 0;
 let paymentMethod = 'cash';
 let selectedCustomer = null;
+let csrfToken = null;
+
+async function ensureSecurityContext() {
+    if (csrfToken) return;
+    const response = await fetch('api/session');
+    if (!response.ok) throw new Error('Phiên đăng nhập đã hết hạn.');
+    csrfToken = (await response.json()).csrfToken;
+}
+ensureSecurityContext().catch(() => {});
 
 function onCustomerCodeInput(el) {
     el.value = el.value.toUpperCase().replace(/\s/g, '');
@@ -618,6 +627,7 @@ async function checkout() {
     if (Object.keys(cart).length === 0) {
         alert('Giỏ hàng đang trống! Vui lòng chọn sản phẩm trước khi thanh toán.'); return;
     }
+    try { await ensureSecurityContext(); } catch (error) { alert(error.message); return; }
     const customerCode = document.getElementById('customerCodeInput').value.trim();
     if (customerCode && !selectedCustomer) {
         const found = await lookupCustomer();
@@ -633,6 +643,7 @@ async function checkout() {
     const body = new URLSearchParams();
     Object.values(cart).forEach(item => { body.append('productCode', item.id); body.append('quantity', item.qty); });
     body.set('customerCode', customerCode); body.set('paymentMethod', paymentMethod.toUpperCase());
+    body.set('csrfToken', csrfToken);
     if (paymentMethod === 'cash') body.set('cashReceived', cash);
     const button = document.querySelector('.checkout-btn'); button.disabled = true;
     try {

@@ -40,7 +40,7 @@
                 <td>${product.stockQuantity} ${product.unit}</td>
                 <td><c:choose><c:when test="${product.outOfStock}"><span class="badge bg-danger">Hết hàng</span></c:when><c:when test="${product.lowStock}"><span class="badge bg-warning text-dark">Sắp hết</span></c:when><c:otherwise><span class="badge bg-success">Đủ hàng</span></c:otherwise></c:choose></td>
                 <td class="text-end pe-4"><a class="btn btn-sm btn-outline-primary" href="${pageContext.request.contextPath}/products?editId=${product.id}"><i class="fa-solid fa-pen"></i></a>
-                    <form method="post" class="d-inline" action="${pageContext.request.contextPath}/products" onsubmit="return confirm('Ngừng kinh doanh sản phẩm này?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="${product.id}"><button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-ban"></i></button></form></td>
+                    <form method="post" class="d-inline" action="${pageContext.request.contextPath}/products" onsubmit="return confirm('Ngừng kinh doanh sản phẩm này?')"><input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="${product.id}"><button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-ban"></i></button></form></td>
             </tr></c:forEach>
             <c:if test="${empty products}"><tr><td colspan="7" class="text-center text-muted py-5">Không tìm thấy sản phẩm.</td></tr></c:if>
             </tbody></table>
@@ -50,7 +50,7 @@
     </div>
 </main></div>
 
-<div class="modal fade" id="productModal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><form method="post" action="${pageContext.request.contextPath}/products">
+<div class="modal fade" id="productModal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><form method="post" action="${pageContext.request.contextPath}/products"><input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
     <div class="modal-header"><div><h5 class="modal-title fw-bold">${empty editingProduct ? 'Thêm sản phẩm' : 'Sửa sản phẩm'}</h5><small class="text-muted">Tồn đầu kỳ của sản phẩm mới là 0</small></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
     <div class="modal-body"><input type="hidden" name="action" value="save"><input type="hidden" name="id" value="${editingProduct.id}">
         <div class="row g-3">
@@ -68,7 +68,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-fetch('${pageContext.request.contextPath}/common/sidebar.html?v=4').then(r=>r.text()).then(html=>{document.getElementById('sidebar-placeholder').outerHTML=html;document.querySelector('.sidebar-nav a[href="products"]')?.classList.add('active');});
+fetch('${pageContext.request.contextPath}/common/sidebar').then(r=>r.text()).then(html=>{document.getElementById('sidebar-placeholder').outerHTML=html;document.querySelector('.sidebar-nav a[href$="/products"]')?.classList.add('active');});
 <c:if test="${not empty editingProduct}">bootstrap.Modal.getOrCreateInstance(document.getElementById('productModal')).show();</c:if>
 </script>
 </body></html>
