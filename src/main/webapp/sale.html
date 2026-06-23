@@ -13,13 +13,16 @@
 
         .pos-wrapper {
             display: flex;
-            height: calc(100vh - 65px); /* subtract topbar height */
+            flex: 1;
+            min-height: 0;
             overflow: hidden;
         }
 
         /* Product Grid Panel */
         .product-panel {
             flex: 1;
+            min-width: 0;
+            min-height: 0;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -104,10 +107,14 @@
         /* Cart Panel */
         .cart-panel {
             width: 360px;
+            min-height: 0;
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
             background: #fff;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scrollbar-gutter: stable;
         }
         .cart-header {
             padding: 14px 18px;
@@ -119,6 +126,7 @@
         }
         .cart-items {
             flex: 1;
+            min-height: 100px;
             overflow-y: auto;
             padding: 8px 0;
         }
@@ -176,10 +184,50 @@
             padding: 14px 18px;
             background: #f8fafc;
         }
+        .cart-panel::-webkit-scrollbar,
+        .cart-items::-webkit-scrollbar,
+        .product-grid::-webkit-scrollbar { width: 7px; }
+        .cart-panel::-webkit-scrollbar-thumb,
+        .cart-items::-webkit-scrollbar-thumb,
+        .product-grid::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 99px;
+        }
         .checkout-btn {
             font-size: 1.1rem; font-weight: 700;
             padding: 13px; border-radius: 10px;
             letter-spacing: 0.5px;
+        }
+        .payment-method {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .payment-option {
+            border: 1.5px solid #cbd5e1;
+            background: #fff;
+            color: #475569;
+            border-radius: 9px;
+            padding: 9px 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .payment-option.active {
+            border-color: #3b82f6;
+            background: #eff6ff;
+            color: #2563eb;
+        }
+        .qr-placeholder {
+            border: 1px dashed #93c5fd;
+            background: #eff6ff;
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+        }
+        #discountTypeAmountBtn.active, #discountTypePercentBtn.active {
+            background: #3b82f6;
+            color: #fff;
+            border-color: #3b82f6;
         }
     </style>
 </head>
@@ -190,9 +238,12 @@
     <div id="sidebar-placeholder"></div>
 
     <!-- MAIN CONTENT -->
-    <div class="main-content" style="overflow:hidden;">
-        <div class="topbar">
+    <div class="main-content" style="height:100vh; min-height:0; overflow:hidden;">
+        <div class="topbar d-flex justify-content-between align-items-center">
             <h1 class="h4 m-0 fw-bold">🛒 Màn Hình Bán Hàng (POS)</h1>
+            <button type="button" class="btn btn-primary" onclick="openQrPayment()">
+                <i class="fa-solid fa-qrcode me-2"></i>Thanh toán QR
+            </button>
         </div>
 
         <div class="pos-wrapper">
@@ -257,12 +308,56 @@
                         <span class="text-muted">Số mặt hàng:</span>
                         <span class="fw-semibold" id="summaryItemCount">0</span>
                     </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Tạm tính:</span>
+                        <span class="fw-semibold" id="subtotalAmount">0 đ</span>
+                    </div>
+
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted">Giảm giá:</span>
+                            <span class="fw-semibold text-success" id="discountAmountDisplay">0 đ</span>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <button type="button" class="btn btn-outline-secondary active" id="discountTypeAmountBtn" onclick="setDiscountType('AMOUNT')">đ</button>
+                            <button type="button" class="btn btn-outline-secondary" id="discountTypePercentBtn" onclick="setDiscountType('PERCENT')">%</button>
+                            <input type="text" id="discountInput" class="form-control text-end" placeholder="0" oninput="onDiscountInput(this)">
+                        </div>
+                        <div class="invalid-feedback" id="discountError">Giá trị giảm giá không hợp lệ.</div>
+                    </div>
+
                     <div class="d-flex justify-content-between mb-3">
                         <span class="fw-bold fs-5">Tổng tiền:</span>
                         <span class="fw-bold fs-5 text-danger" id="totalAmount">0 đ</span>
                     </div>
 
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-muted mb-1" for="customerCodeInput">
+                            Mã khách hàng <span class="fw-normal">(không bắt buộc)</span>
+                        </label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white"><i class="fa-solid fa-user-tag text-muted"></i></span>
+                            <input type="text" id="customerCodeInput" class="form-control text-uppercase"
+                                placeholder="Ví dụ: KH001" oninput="onCustomerCodeInput(this)">
+                            <button class="btn btn-outline-primary" type="button" onclick="lookupCustomer()">Kiểm tra</button>
+                        </div>
+                        <div class="small mt-1 d-none" id="customerFeedback"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="small fw-semibold text-muted mb-2">Phương thức thanh toán</div>
+                        <div class="payment-method">
+                            <button type="button" class="payment-option active" id="cashMethodBtn" onclick="setPaymentMethod('cash')">
+                                <i class="fa-solid fa-money-bill-wave me-1"></i>Tiền mặt
+                            </button>
+                            <button type="button" class="payment-option" id="qrMethodBtn" onclick="setPaymentMethod('qr')">
+                                <i class="fa-solid fa-qrcode me-1"></i>Quét QR
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Cash Input -->
+                    <div id="cashPaymentPanel">
                     <div class="mb-2">
                         <label class="form-label small fw-semibold text-muted mb-1">
                             Tiền khách đưa (đ) <span class="text-danger">*</span>
@@ -277,6 +372,14 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <span class="text-muted small fw-semibold">Tiền thối lại:</span>
                         <span class="fw-bold text-success fs-5" id="changeAmount">0 đ</span>
+                    </div>
+                    </div>
+
+                    <div class="qr-placeholder mb-3 d-none" id="qrPaymentPanel">
+                        <i class="fa-solid fa-qrcode text-primary fs-1 mb-2"></i>
+                        <div class="fw-bold">Thanh toán QR</div>
+                        <div class="small text-muted">Khu vực tạo mã QR động sẽ được tích hợp ở giai đoạn backend.</div>
+                        <span class="badge text-bg-light border mt-2">Sẵn sàng phát triển sau</span>
                     </div>
 
                     <button class="btn btn-success w-100 checkout-btn" onclick="checkout()">
@@ -315,27 +418,18 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // ---- Load Sidebar ----
-fetch('common/sidebar.html')
+fetch('common/sidebar')
     .then(r => r.text())
     .then(html => {
         document.getElementById('sidebar-placeholder').outerHTML = html;
-        const link = document.querySelector('.sidebar-nav a[href="sale.html"]');
+        const link = document.querySelector('.sidebar-nav a[href$="/sale.html"]');
         if (link) link.classList.add('active');
     });
 
 // ============================================================
-//  PRODUCT DATA (Mock – replace with backend API later)
+//  PRODUCT DATA (loaded from PostgreSQL through Java Web)
 // ============================================================
-const PRODUCTS = [
-    { id:'SP001', name:'Coca Cola 320ml',         cat:'Nước ngọt', price:10000, stock:120, icon:'fa-bottle-water',   iconColor:'text-primary',   bgColor:'bg-primary-subtle'   },
-    { id:'SP002', name:'Bánh Quy Cosy 200g',      cat:'Bánh kẹo',  price:35000, stock:8,   icon:'fa-cookie-bite',    iconColor:'text-warning',   bgColor:'bg-warning-subtle'   },
-    { id:'SP003', name:'Mì Hảo Hảo Tôm Chua Cay',cat:'Mì ăn liền',price:4500,  stock:0,   icon:'fa-bowl-food',      iconColor:'text-danger',    bgColor:'bg-danger-subtle'    },
-    { id:'SP004', name:'Aquafina 500ml',           cat:'Nước ngọt', price:6000,  stock:85,  icon:'fa-droplet',        iconColor:'text-info',      bgColor:'bg-info-subtle'      },
-    { id:'SP005', name:'Kẹo dẻo Haribo 80g',      cat:'Bánh kẹo',  price:22000, stock:4,   icon:'fa-candy-cane',     iconColor:'text-success',   bgColor:'bg-success-subtle'   },
-    { id:'SP006', name:'Nước mắm Chinsu 500ml',   cat:'Gia vị',    price:45000, stock:30,  icon:'fa-fish',           iconColor:'text-secondary', bgColor:'bg-secondary-subtle' },
-    { id:'SP007', name:'Hạt nêm Knorr 400g',      cat:'Gia vị',    price:38000, stock:50,  icon:'fa-pepper-hot',     iconColor:'text-dark',      bgColor:'bg-light'            },
-    { id:'SP008', name:'Pepsi Lon 330ml',          cat:'Nước ngọt', price:9500,  stock:60,  icon:'fa-bottle-water',   iconColor:'text-primary',   bgColor:'bg-primary-subtle'   },
-];
+let PRODUCTS = [];
 
 // ============================================================
 //  RENDER PRODUCTS
@@ -343,6 +437,8 @@ const PRODUCTS = [
 function renderProducts(list) {
     const grid = document.getElementById('productGrid');
     grid.innerHTML = list.map(p => {
+        const safeName = escapeHtml(p.name);
+        const safeCat = escapeHtml(p.cat);
         const outOfStock = p.stock <= 0;
         const stockBadge = outOfStock
             ? '<span class="badge bg-danger" style="font-size:10px;">Hết hàng</span>'
@@ -351,15 +447,15 @@ function renderProducts(list) {
                 : `<span class="badge bg-success" style="font-size:10px;">Kho: ${p.stock}</span>`;
         return `
         <div class="product-card ${outOfStock ? 'out-of-stock' : ''}"
-             data-id="${p.id}" data-cat="${p.cat}"
-             data-name="${p.name.toLowerCase()}"
+             data-id="${p.id}" data-cat="${safeCat}"
+             data-name="${safeName.toLowerCase()}"
              onclick="${outOfStock ? '' : `addToCart('${p.id}')`}">
-            <div class="icon-area ${p.bgColor} ${p.iconColor}">
-                <i class="fa-solid ${p.icon}"></i>
+            <div class="icon-area bg-primary-subtle text-primary">
+                <i class="fa-solid fa-box"></i>
             </div>
             <div class="card-info">
-                <div class="cat-label">${p.cat}</div>
-                <div class="prod-name" title="${p.name}">${p.name}</div>
+                <div class="cat-label">${safeCat}</div>
+                <div class="prod-name" title="${safeName}">${safeName}</div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="prod-price">${fmt(p.price)}</span>
                     ${stockBadge}
@@ -368,13 +464,94 @@ function renderProducts(list) {
         </div>`;
     }).join('');
 }
-renderProducts(PRODUCTS);
+async function loadProducts() {
+    try {
+        const response = await fetch('api/products/sale');
+        if (!response.ok) throw new Error('Không tải được sản phẩm.');
+        PRODUCTS = await response.json(); renderProducts(PRODUCTS);
+        const categories = [...new Set(PRODUCTS.map(p => p.cat))];
+        const select = document.getElementById('categoryFilter');
+        select.innerHTML = '<option value="">Tất cả danh mục</option>' + categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    } catch (e) { document.getElementById('productGrid').innerHTML = `<div class="alert alert-danger">${escapeHtml(e.message)}</div>`; }
+}
+loadProducts();
 
 // ============================================================
 //  CART STATE
 // ============================================================
 let cart = {}; // { id: { ...product, qty } }
-let cartTotal = 0;
+let cartTotal = 0;       // tạm tính (subtotal trước giảm giá)
+let discountType = 'AMOUNT'; // 'AMOUNT' (đ) hoặc 'PERCENT' (%)
+let discountValue = 0;
+let grandTotal = 0;      // tổng tiền sau giảm giá
+let paymentMethod = 'cash';
+let selectedCustomer = null;
+let csrfToken = null;
+
+async function ensureSecurityContext() {
+    if (csrfToken) return;
+    const response = await fetch('api/session');
+    if (!response.ok) throw new Error('Phiên đăng nhập đã hết hạn.');
+    csrfToken = (await response.json()).csrfToken;
+}
+ensureSecurityContext().catch(() => {});
+
+function onCustomerCodeInput(el) {
+    el.value = el.value.toUpperCase().replace(/\s/g, '');
+    selectedCustomer = null;
+    el.classList.remove('is-valid', 'is-invalid');
+    document.getElementById('customerFeedback').classList.add('d-none');
+}
+
+async function lookupCustomer() {
+    const input = document.getElementById('customerCodeInput');
+    const feedback = document.getElementById('customerFeedback');
+    const code = input.value.trim().toUpperCase();
+    selectedCustomer = null;
+    input.classList.remove('is-valid', 'is-invalid');
+    feedback.classList.remove('d-none', 'text-success', 'text-danger', 'text-muted');
+    if (!code) {
+        feedback.textContent = 'Để trống để thanh toán cho khách lẻ.';
+        feedback.classList.add('text-muted');
+        return true;
+    }
+
+    try {
+        const response = await fetch(`api/customers/lookup?code=${encodeURIComponent(code)}`);
+        if (!response.ok) throw new Error('Lookup failed');
+        const data = await response.json();
+        if (!data.found) {
+            input.classList.add('is-invalid');
+            feedback.textContent = 'Không tìm thấy mã khách hàng này.';
+            feedback.classList.add('text-danger');
+            return false;
+        }
+        selectedCustomer = data;
+        input.classList.add('is-valid');
+        feedback.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i>${data.name} · ${data.phone}`;
+        feedback.classList.add('text-success');
+        return true;
+    } catch (error) {
+        input.classList.add('is-invalid');
+        feedback.textContent = 'Không thể kết nối dịch vụ khách hàng. Hãy chạy ứng dụng Java Web.';
+        feedback.classList.add('text-danger');
+        return false;
+    }
+}
+
+function setPaymentMethod(method) {
+    paymentMethod = method;
+    document.getElementById('cashMethodBtn').classList.toggle('active', method === 'cash');
+    document.getElementById('qrMethodBtn').classList.toggle('active', method === 'qr');
+    document.getElementById('cashPaymentPanel').classList.toggle('d-none', method !== 'cash');
+    document.getElementById('qrPaymentPanel').classList.toggle('d-none', method !== 'qr');
+    document.getElementById('cashInput').classList.remove('is-invalid');
+}
+
+function openQrPayment() {
+    setPaymentMethod('qr');
+    document.getElementById('qrPaymentPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 
 function addToCart(id) {
     const p = PRODUCTS.find(x => x.id === id);
@@ -406,10 +583,20 @@ function removeItem(id) { delete cart[id]; renderCart(); }
 
 function clearCart() {
     cart = {};
+    discountValue = 0;
+    discountType = 'AMOUNT';
+    document.getElementById('discountInput').value = '';
+    document.getElementById('discountInput').classList.remove('is-invalid');
+    document.getElementById('discountTypeAmountBtn').classList.add('active');
+    document.getElementById('discountTypePercentBtn').classList.remove('active');
     renderCart();
     document.getElementById('cashInput').value = '';
     document.getElementById('cashInput').classList.remove('is-invalid');
     document.getElementById('changeAmount').textContent = '0 đ';
+    selectedCustomer = null;
+    document.getElementById('customerCodeInput').value = '';
+    document.getElementById('customerCodeInput').classList.remove('is-valid', 'is-invalid');
+    document.getElementById('customerFeedback').classList.add('d-none');
 }
 
 function renderCart() {
@@ -423,10 +610,11 @@ function renderCart() {
     document.getElementById('cartItems').innerHTML = keys.map(id => {
         const item = cart[id];
         const sub = item.price * item.qty;
+        const safeItemName = escapeHtml(item.name);
         return `
         <div class="cart-item">
             <div class="item-info">
-                <div class="item-name" title="${item.name}">${item.name}</div>
+                <div class="item-name" title="${safeItemName}">${safeItemName}</div>
                 <div class="item-price">${fmt(item.price)} / cái</div>
             </div>
             <div class="qty-ctrl">
@@ -443,13 +631,52 @@ function renderCart() {
 
     document.getElementById('cartCount').textContent = `${keys.length} mặt hàng`;
     document.getElementById('summaryItemCount').textContent = keys.length;
-    document.getElementById('totalAmount').textContent = fmt(cartTotal);
+    document.getElementById('subtotalAmount').textContent = fmt(cartTotal);
+    updateTotals();
+}
 
-    // Recalculate change
+// ============================================================
+//  DISCOUNT — % hoặc số tiền cố định, tính lại tổng tiền
+// ============================================================
+function setDiscountType(type) {
+    discountType = type;
+    document.getElementById('discountTypeAmountBtn').classList.toggle('active', type === 'AMOUNT');
+    document.getElementById('discountTypePercentBtn').classList.toggle('active', type === 'PERCENT');
+    updateTotals();
+}
+
+function onDiscountInput(el) {
+    const raw = el.value.replace(',', '.').trim();
+    const n = parseFloat(raw);
+    discountValue = isNaN(n) || n < 0 ? 0 : n;
+    el.classList.remove('is-invalid');
+    if (discountType === 'PERCENT' && discountValue > 100) {
+        discountValue = 100;
+        el.value = '100';
+        el.classList.add('is-invalid');
+        document.getElementById('discountError').textContent = 'Tối đa 100%.';
+    }
+    updateTotals();
+}
+
+function calculateDiscount() {
+    if (!discountValue || discountValue <= 0) return 0;
+    let amount = discountType === 'PERCENT' ? cartTotal * discountValue / 100 : discountValue;
+    if (amount > cartTotal) amount = cartTotal;
+    return Math.round(amount);
+}
+
+function updateTotals() {
+    const discountAmount = calculateDiscount();
+    grandTotal = Math.max(0, cartTotal - discountAmount);
+    document.getElementById('discountAmountDisplay').textContent = discountAmount > 0 ? `- ${fmt(discountAmount)}` : fmt(0);
+    document.getElementById('totalAmount').textContent = fmt(grandTotal);
+
+    // Recalculate change against tổng tiền sau giảm giá
     const cashRaw = document.getElementById('cashInput').value.replace(/\D/g,'');
     const cash = parseInt(cashRaw) || 0;
-    document.getElementById('changeAmount').textContent = cash >= cartTotal
-        ? fmt(cash - cartTotal) : '0 đ';
+    document.getElementById('changeAmount').textContent = cash >= grandTotal
+        ? fmt(cash - grandTotal) : '0 đ';
 }
 
 // ============================================================
@@ -461,34 +688,45 @@ function onCashInput(el) {
     el.value = n > 0 ? new Intl.NumberFormat('vi-VN').format(n) : '';
     el.classList.remove('is-invalid');
     document.getElementById('changeAmount').textContent =
-        n >= cartTotal ? fmt(n - cartTotal) : '0 đ';
+        n >= grandTotal ? fmt(n - grandTotal) : '0 đ';
 }
 
 // ============================================================
 //  CHECKOUT
 // ============================================================
-function checkout() {
+async function checkout() {
     if (Object.keys(cart).length === 0) {
         alert('Giỏ hàng đang trống! Vui lòng chọn sản phẩm trước khi thanh toán.'); return;
+    }
+    try { await ensureSecurityContext(); } catch (error) { alert(error.message); return; }
+    const customerCode = document.getElementById('customerCodeInput').value.trim();
+    if (customerCode && !selectedCustomer) {
+        const found = await lookupCustomer();
+        if (!found) return;
     }
     const cashRaw = document.getElementById('cashInput').value.replace(/\D/g,'');
     const cash = parseInt(cashRaw) || 0;
     const cashEl = document.getElementById('cashInput');
-
-    if (!cashRaw || cash < cartTotal) {
+    if (paymentMethod === 'cash' && (!cashRaw || cash < grandTotal)) {
         cashEl.classList.add('is-invalid'); return;
     }
     cashEl.classList.remove('is-invalid');
-
-    const change = cash - cartTotal;
-    document.getElementById('successMsg').innerHTML =
-        `Tổng hóa đơn: <strong class="text-danger">${fmt(cartTotal)}</strong> &nbsp;|&nbsp;
-         Tiền khách trả: <strong>${fmt(cash)}</strong> &nbsp;|&nbsp;
-         Tiền thối lại: <strong class="text-success">${fmt(change)}</strong>`;
-
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('successModal')).show();
-    clearCart();
-    cashEl.value = '';
+    const body = new URLSearchParams();
+    Object.values(cart).forEach(item => { body.append('productCode', item.id); body.append('quantity', item.qty); });
+    body.set('customerCode', customerCode); body.set('paymentMethod', paymentMethod.toUpperCase());
+    body.set('csrfToken', csrfToken);
+    body.set('discountType', discountType); body.set('discountValue', discountValue || 0);
+    if (paymentMethod === 'cash') body.set('cashReceived', cash);
+    const button = document.querySelector('.checkout-btn'); button.disabled = true;
+    try {
+        const response = await fetch('api/checkout', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}, body});
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Thanh toán thất bại.');
+        const discountLine = result.discount > 0 ? `<br>Giảm giá: <strong class="text-success">- ${fmt(result.discount)}</strong>` : '';
+        document.getElementById('successMsg').innerHTML = `Hóa đơn <strong>${result.code}</strong> đã được lưu.${discountLine}<br>Tổng tiền: <strong class="text-danger">${fmt(result.total)}</strong>${result.change == null ? '' : `<br>Tiền thối: <strong class="text-success">${fmt(result.change)}</strong>`}`;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('successModal')).show(); clearCart(); cashEl.value=''; await loadProducts();
+    } catch (error) { alert(error.message); }
+    finally { button.disabled = false; }
 }
 
 // ============================================================
@@ -508,6 +746,7 @@ function filterProducts() {
 //  HELPERS
 // ============================================================
 function fmt(n) { return new Intl.NumberFormat('vi-VN').format(n) + ' đ'; }
+function escapeHtml(value) { const el=document.createElement('div'); el.textContent=value??''; return el.innerHTML; }
 </script>
 </body>
 </html>
