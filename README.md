@@ -9,6 +9,7 @@
 - Bán hàng POS, thanh toán tiền mặt hoặc giao diện QR dự phòng.
 - Lưu, tra cứu và hủy hóa đơn; hủy hóa đơn tự động hoàn kho.
 - Đăng nhập BCrypt và phân quyền `ADMIN`/`CASHIER`.
+- Quản lý tài khoản: tạo, sửa, khóa/mở khóa, đổi mật khẩu (chính mình) và đặt lại mật khẩu (ADMIN).
 - Dashboard lấy dữ liệu trực tiếp từ PostgreSQL.
 
 ## Yêu cầu
@@ -165,3 +166,33 @@ Migration chưa được chạy hoặc đã chạy nhầm trên database `postgr
 ### Lỗi CSRF hoặc “Phiên biểu mẫu không hợp lệ”
 
 Tải lại trang và đăng nhập lại nếu phiên đã hết hạn.
+
+## Lịch sử thay đổi
+
+### 2026-06-23 (lần 2)
+
+- **Quản lý tài khoản đầy đủ** (`UserDao`, `JdbcUserDao`, `AuthService`, `UserServlet`, `users.jsp`):
+  - **Sửa thông tin**: ADMIN chỉnh họ tên và vai trò của bất kỳ tài khoản nào qua modal "Chỉnh sửa tài khoản".
+  - **Khóa / Mở khóa**: ADMIN khoá hoặc mở khoá tài khoản bằng nút 🔒/🔓 trên bảng danh sách; không thể khoá chính tài khoản đang đăng nhập.
+  - **Đổi mật khẩu (chính mình)**: mọi người dùng có thể đổi mật khẩu qua modal "Đổi mật khẩu"; yêu cầu xác nhận mật khẩu hiện tại và nhập lại mật khẩu mới để tránh nhầm lẫn.
+  - **Đặt lại mật khẩu (ADMIN)**: ADMIN đặt lại mật khẩu cho bất kỳ tài khoản nào mà không cần mật khẩu cũ, thông qua modal "Đặt lại mật khẩu".
+  - `UserDao` bổ sung `findById`, `update`, `setActive`, `updatePassword`; `JdbcUserDao` implement đầy đủ bằng `RETURNING *` và parameterized query.
+  - `UserServlet.doPost` phân nhánh theo tham số ẩn `action` (`edit` / `lock` / `unlock` / `change-password` / `reset-password` / trống = tạo mới); tất cả thao tác quản trị đều kiểm tra `ADMIN` role trước khi thực thi.
+  - Mọi xác thực mật khẩu dùng BCrypt; mật khẩu mới tối thiểu 8 ký tự.
+  - Sidebar bổ sung truyền `currentUserId` và `isAdmin` vào JSP để ẩn/hiện nút theo quyền.
+
+### 2026-06-23
+
+- Xoá các file HTML prototype cũ ở `src/main/webapp/` (`products.html`, `categories.html`, `customers.html`, `inventory.html`, `invoices.html`) vì các module này đã chuyển sang Servlet + JSP lấy dữ liệu trực tiếp từ PostgreSQL. `AuthFilter` vẫn giữ bảng redirect các URL `.html` cũ sang route mới nên link/bookmark cũ không bị lỗi 404.
+- `sale.html` được giữ lại vì trang Bán hàng (POS) vẫn đang dùng kiến trúc HTML tĩnh + AJAX gọi `/api/products/sale`, `/api/checkout`, `/api/customers/lookup`.
+- **Thêm giảm giá hóa đơn** (cột `discount_amount` đã có sẵn trong bảng `invoices` nhưng chưa được dùng):
+  - `sale.html`: thêm ô nhập giảm giá theo **%** hoặc **số tiền (đ)** trong khung tóm tắt giỏ hàng, hiển thị Tạm tính / Giảm giá / Tổng tiền riêng biệt; tiền thối và điều kiện thanh toán tiền mặt được tính lại theo tổng tiền sau giảm giá.
+  - `CheckoutServlet`: nhận thêm `discountType` và `discountValue` từ form, trả về `subtotal`/`discount`/`total` trong JSON response.
+  - `InvoiceService.checkout`: validate giá trị giảm giá (không âm, % không vượt 100), giữ overload cũ (không có giảm giá) để tương thích code/test hiện có.
+  - `InvoiceDao` / `JdbcInvoiceDao`: số tiền giảm giá được **tính lại ở backend** dựa trên subtotal đã chốt giá từ DB (không tin số FE gửi lên), lưu vào cột `discount_amount`, và `total_amount` = subtotal − discount.
+
+## Việc còn thiếu / chưa hoàn thiện
+
+- **Thanh toán QR**: chỉ có giao diện ở `sale.html`, `CheckoutServlet` chưa sinh mã QR động hay tích hợp cổng thanh toán nào — payment method "qr" hiện được lưu như một chuỗi text, xử lý giống tiền mặt.
+- **Supplier / Purchase Order**: có model và DAO nhưng chưa có Service/Servlet/trang riêng để quản lý nhà cung cấp hay xem lịch sử đơn nhập hàng; hiện chỉ dùng nội bộ khi nhập kho.
+- **Test**: mới có vài "smoke test" dạng `main()` chạy tay (`src/test/java/.../*SmokeTest.java`), cần kết nối DB thật, chưa phải unit test tự động hay CI.

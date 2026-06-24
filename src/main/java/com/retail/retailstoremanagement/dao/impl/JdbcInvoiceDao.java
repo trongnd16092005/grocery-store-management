@@ -5,6 +5,7 @@ import com.retail.retailstoremanagement.model.*;
 import com.retail.retailstoremanagement.util.DatabaseConnection;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.*;
 import java.time.OffsetDateTime;
 import java.util.*;
@@ -12,7 +13,8 @@ import java.util.*;
 public class JdbcInvoiceDao implements InvoiceDao {
     @Override
     public Invoice checkout(Map<String, Integer> items, String customerCode, PaymentMethod method,
-                            BigDecimal cashReceived, Long cashierId) throws SQLException {
+                            BigDecimal cashReceived, DiscountType discountType, BigDecimal discountValue,
+                            Long cashierId) throws SQLException {
         try (Connection c = DatabaseConnection.getConnection()) {
             c.setAutoCommit(false);
             try {
@@ -24,13 +26,15 @@ public class JdbcInvoiceDao implements InvoiceDao {
                     details.add(detail);
                     subtotal = subtotal.add(detail.calculateLineTotal());
                 }
+                BigDecimal discountAmount = calculateDiscount(subtotal, discountType, discountValue);
+                BigDecimal total = subtotal.subtract(discountAmount);
                 BigDecimal change = null;
                 if (method == PaymentMethod.CASH) {
-                    if (cashReceived == null || cashReceived.compareTo(subtotal) < 0)
+                    if (cashReceived == null || cashReceived.compareTo(total) < 0)
                         throw new SQLException("Tiền khách đưa chưa đủ.");
-                    change = cashReceived.subtract(subtotal);
+                    change = cashReceived.subtract(total);
                 }
-                long invoiceId = insertInvoice(c, customerId, cashierId, method, subtotal,
+                long invoiceId = insertInvoice(c, customerId, cashierId, method, subtotal, discountAmount, total,
                         method == PaymentMethod.CASH ? cashReceived : null, change);
                 for (InvoiceDetail d : details) {
                     insertDetail(c, invoiceId, d);
@@ -44,6 +48,17 @@ public class JdbcInvoiceDao implements InvoiceDao {
                 throw new SQLException("Không thể tạo hóa đơn.", e);
             } finally { c.setAutoCommit(true); }
         }
+    }
+
+    /** Tính số tiền giảm giá dựa trên subtotal đã chốt ở server, không tin số FE gửi lên. */
+    private BigDecimal calculateDiscount(BigDecimal subtotal, DiscountType type, BigDecimal value) {
+        if (value == null || value.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;
+        BigDecimal amount = type == DiscountType.PERCENT
+                ? subtotal.multiply(value).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+                : value.setScale(2, RoundingMode.HALF_UP);
+        if (amount.compareTo(subtotal) > 0) amount = subtotal;
+        if (amount.compareTo(BigDecimal.ZERO) < 0) amount = BigDecimal.ZERO;
+        return amount;
     }
 
     private Long findCustomer(Connection c, String code) throws SQLException {
@@ -77,13 +92,14 @@ public class JdbcInvoiceDao implements InvoiceDao {
     }
 
     private long insertInvoice(Connection c, Long customerId, Long cashierId, PaymentMethod method,
-                               BigDecimal subtotal, BigDecimal cash, BigDecimal change) throws SQLException {
-        String sql = "INSERT INTO invoices(code,customer_id,cashier_id,payment_method,status,subtotal,total_amount,cash_received,change_amount) "
-                + "VALUES ('HD'||LPAD(nextval('invoice_code_seq')::text,3,'0'),?,?,?,'PAID',?,?,?,?) RETURNING id";
+                               BigDecimal subtotal, BigDecimal discountAmount, BigDecimal total,
+                               BigDecimal cash, BigDecimal change) throws SQLException {
+        String sql = "INSERT INTO invoices(code,customer_id,cashier_id,payment_method,status,subtotal,discount_amount,total_amount,cash_received,change_amount) "
+                + "VALUES ('HD'||LPAD(nextval('invoice_code_seq')::text,3,'0'),?,?,?,'PAID',?,?,?,?,?) RETURNING id";
         try (PreparedStatement s = c.prepareStatement(sql)) {
             nullableLong(s,1,customerId); nullableLong(s,2,cashierId); s.setString(3,method.name());
-            s.setBigDecimal(4,subtotal); s.setBigDecimal(5,subtotal);
-            nullableDecimal(s,6,cash); nullableDecimal(s,7,change);
+            s.setBigDecimal(4,subtotal); s.setBigDecimal(5,discountAmount); s.setBigDecimal(6,total);
+            nullableDecimal(s,7,cash); nullableDecimal(s,8,change);
             try(ResultSet r=s.executeQuery()){ r.next(); return r.getLong(1); }
         }
     }

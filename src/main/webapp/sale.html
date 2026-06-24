@@ -224,6 +224,11 @@
             padding: 12px;
             text-align: center;
         }
+        #discountTypeAmountBtn.active, #discountTypePercentBtn.active {
+            background: #3b82f6;
+            color: #fff;
+            border-color: #3b82f6;
+        }
     </style>
 </head>
 <body>
@@ -303,6 +308,24 @@
                         <span class="text-muted">Số mặt hàng:</span>
                         <span class="fw-semibold" id="summaryItemCount">0</span>
                     </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Tạm tính:</span>
+                        <span class="fw-semibold" id="subtotalAmount">0 đ</span>
+                    </div>
+
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted">Giảm giá:</span>
+                            <span class="fw-semibold text-success" id="discountAmountDisplay">0 đ</span>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <button type="button" class="btn btn-outline-secondary active" id="discountTypeAmountBtn" onclick="setDiscountType('AMOUNT')">đ</button>
+                            <button type="button" class="btn btn-outline-secondary" id="discountTypePercentBtn" onclick="setDiscountType('PERCENT')">%</button>
+                            <input type="text" id="discountInput" class="form-control text-end" placeholder="0" oninput="onDiscountInput(this)">
+                        </div>
+                        <div class="invalid-feedback" id="discountError">Giá trị giảm giá không hợp lệ.</div>
+                    </div>
+
                     <div class="d-flex justify-content-between mb-3">
                         <span class="fw-bold fs-5">Tổng tiền:</span>
                         <span class="fw-bold fs-5 text-danger" id="totalAmount">0 đ</span>
@@ -457,7 +480,10 @@ loadProducts();
 //  CART STATE
 // ============================================================
 let cart = {}; // { id: { ...product, qty } }
-let cartTotal = 0;
+let cartTotal = 0;       // tạm tính (subtotal trước giảm giá)
+let discountType = 'AMOUNT'; // 'AMOUNT' (đ) hoặc 'PERCENT' (%)
+let discountValue = 0;
+let grandTotal = 0;      // tổng tiền sau giảm giá
 let paymentMethod = 'cash';
 let selectedCustomer = null;
 let csrfToken = null;
@@ -557,6 +583,12 @@ function removeItem(id) { delete cart[id]; renderCart(); }
 
 function clearCart() {
     cart = {};
+    discountValue = 0;
+    discountType = 'AMOUNT';
+    document.getElementById('discountInput').value = '';
+    document.getElementById('discountInput').classList.remove('is-invalid');
+    document.getElementById('discountTypeAmountBtn').classList.add('active');
+    document.getElementById('discountTypePercentBtn').classList.remove('active');
     renderCart();
     document.getElementById('cashInput').value = '';
     document.getElementById('cashInput').classList.remove('is-invalid');
@@ -599,13 +631,52 @@ function renderCart() {
 
     document.getElementById('cartCount').textContent = `${keys.length} mặt hàng`;
     document.getElementById('summaryItemCount').textContent = keys.length;
-    document.getElementById('totalAmount').textContent = fmt(cartTotal);
+    document.getElementById('subtotalAmount').textContent = fmt(cartTotal);
+    updateTotals();
+}
 
-    // Recalculate change
+// ============================================================
+//  DISCOUNT — % hoặc số tiền cố định, tính lại tổng tiền
+// ============================================================
+function setDiscountType(type) {
+    discountType = type;
+    document.getElementById('discountTypeAmountBtn').classList.toggle('active', type === 'AMOUNT');
+    document.getElementById('discountTypePercentBtn').classList.toggle('active', type === 'PERCENT');
+    updateTotals();
+}
+
+function onDiscountInput(el) {
+    const raw = el.value.replace(',', '.').trim();
+    const n = parseFloat(raw);
+    discountValue = isNaN(n) || n < 0 ? 0 : n;
+    el.classList.remove('is-invalid');
+    if (discountType === 'PERCENT' && discountValue > 100) {
+        discountValue = 100;
+        el.value = '100';
+        el.classList.add('is-invalid');
+        document.getElementById('discountError').textContent = 'Tối đa 100%.';
+    }
+    updateTotals();
+}
+
+function calculateDiscount() {
+    if (!discountValue || discountValue <= 0) return 0;
+    let amount = discountType === 'PERCENT' ? cartTotal * discountValue / 100 : discountValue;
+    if (amount > cartTotal) amount = cartTotal;
+    return Math.round(amount);
+}
+
+function updateTotals() {
+    const discountAmount = calculateDiscount();
+    grandTotal = Math.max(0, cartTotal - discountAmount);
+    document.getElementById('discountAmountDisplay').textContent = discountAmount > 0 ? `- ${fmt(discountAmount)}` : fmt(0);
+    document.getElementById('totalAmount').textContent = fmt(grandTotal);
+
+    // Recalculate change against tổng tiền sau giảm giá
     const cashRaw = document.getElementById('cashInput').value.replace(/\D/g,'');
     const cash = parseInt(cashRaw) || 0;
-    document.getElementById('changeAmount').textContent = cash >= cartTotal
-        ? fmt(cash - cartTotal) : '0 đ';
+    document.getElementById('changeAmount').textContent = cash >= grandTotal
+        ? fmt(cash - grandTotal) : '0 đ';
 }
 
 // ============================================================
@@ -617,7 +688,7 @@ function onCashInput(el) {
     el.value = n > 0 ? new Intl.NumberFormat('vi-VN').format(n) : '';
     el.classList.remove('is-invalid');
     document.getElementById('changeAmount').textContent =
-        n >= cartTotal ? fmt(n - cartTotal) : '0 đ';
+        n >= grandTotal ? fmt(n - grandTotal) : '0 đ';
 }
 
 // ============================================================
@@ -636,7 +707,7 @@ async function checkout() {
     const cashRaw = document.getElementById('cashInput').value.replace(/\D/g,'');
     const cash = parseInt(cashRaw) || 0;
     const cashEl = document.getElementById('cashInput');
-    if (paymentMethod === 'cash' && (!cashRaw || cash < cartTotal)) {
+    if (paymentMethod === 'cash' && (!cashRaw || cash < grandTotal)) {
         cashEl.classList.add('is-invalid'); return;
     }
     cashEl.classList.remove('is-invalid');
@@ -644,13 +715,15 @@ async function checkout() {
     Object.values(cart).forEach(item => { body.append('productCode', item.id); body.append('quantity', item.qty); });
     body.set('customerCode', customerCode); body.set('paymentMethod', paymentMethod.toUpperCase());
     body.set('csrfToken', csrfToken);
+    body.set('discountType', discountType); body.set('discountValue', discountValue || 0);
     if (paymentMethod === 'cash') body.set('cashReceived', cash);
     const button = document.querySelector('.checkout-btn'); button.disabled = true;
     try {
         const response = await fetch('api/checkout', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}, body});
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.message || 'Thanh toán thất bại.');
-        document.getElementById('successMsg').innerHTML = `Hóa đơn <strong>${result.code}</strong> đã được lưu.<br>Tổng tiền: <strong class="text-danger">${fmt(result.total)}</strong>${result.change == null ? '' : `<br>Tiền thối: <strong class="text-success">${fmt(result.change)}</strong>`}`;
+        const discountLine = result.discount > 0 ? `<br>Giảm giá: <strong class="text-success">- ${fmt(result.discount)}</strong>` : '';
+        document.getElementById('successMsg').innerHTML = `Hóa đơn <strong>${result.code}</strong> đã được lưu.${discountLine}<br>Tổng tiền: <strong class="text-danger">${fmt(result.total)}</strong>${result.change == null ? '' : `<br>Tiền thối: <strong class="text-success">${fmt(result.change)}</strong>`}`;
         bootstrap.Modal.getOrCreateInstance(document.getElementById('successModal')).show(); clearCart(); cashEl.value=''; await loadProducts();
     } catch (error) { alert(error.message); }
     finally { button.disabled = false; }
