@@ -9,8 +9,12 @@ public class Invoice extends BaseEntity {
     private String code;
     private Long customerId;
     private Long cashierId;
+    private Long discountApprovedBy;
+    private Long discountCodeId;
+    private String discountCode;
     private String customerName;
     private String cashierName;
+    private String discountApproverName;
     private PaymentMethod paymentMethod;
     private InvoiceStatus status = InvoiceStatus.PAID;
     private BigDecimal subtotal = BigDecimal.ZERO;
@@ -19,6 +23,7 @@ public class Invoice extends BaseEntity {
     private BigDecimal cashReceived;
     private BigDecimal changeAmount;
     private String note;
+    private String discountReason;
     private OffsetDateTime createdAt;
     private OffsetDateTime cancelledAt;
     private List<InvoiceDetail> details = new ArrayList<>();
@@ -47,10 +52,27 @@ public class Invoice extends BaseEntity {
         this.cashierId = cashierId;
     }
 
+    public Long getDiscountApprovedBy() {
+        return discountApprovedBy;
+    }
+
+    public void setDiscountApprovedBy(Long discountApprovedBy) {
+        this.discountApprovedBy = discountApprovedBy;
+    }
+
+    public Long getDiscountCodeId() { return discountCodeId; }
+    public void setDiscountCodeId(Long discountCodeId) { this.discountCodeId = discountCodeId; }
+    public String getDiscountCode() { return discountCode; }
+    public void setDiscountCode(String discountCode) { this.discountCode = discountCode; }
+
     public String getCustomerName() { return customerName; }
     public void setCustomerName(String customerName) { this.customerName = customerName; }
     public String getCashierName() { return cashierName; }
     public void setCashierName(String cashierName) { this.cashierName = cashierName; }
+    public String getDiscountApproverName() { return discountApproverName; }
+    public void setDiscountApproverName(String discountApproverName) {
+        this.discountApproverName = discountApproverName;
+    }
 
     public PaymentMethod getPaymentMethod() {
         return paymentMethod;
@@ -114,6 +136,14 @@ public class Invoice extends BaseEntity {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public String getDiscountReason() {
+        return discountReason;
+    }
+
+    public void setDiscountReason(String discountReason) {
+        this.discountReason = discountReason;
     }
 
     public OffsetDateTime getCreatedAt() {

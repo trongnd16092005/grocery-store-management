@@ -9,7 +9,13 @@ Database: `grocery_store`
 3. Open and execute `migrations/V1__create_schema.sql`.
 4. Open and execute `migrations/V2__seed_demo_data.sql`.
 5. Open and execute `migrations/V3__business_code_sequences.sql`.
-6. Verify with:
+6. Open and execute `migrations/V4__add_user_auth_version.sql`.
+7. Open and execute `migrations/V5__seed_additional_products.sql`.
+8. Open and execute `migrations/V6__multi_store_tenancy.sql`.
+9. Open and execute `migrations/V7__enforce_tenant_foreign_keys.sql`.
+10. Open and execute `migrations/V8__purchase_orders_discount_approval.sql`.
+11. Open and execute `migrations/V9__discount_codes.sql`.
+12. Verify with:
 
 ```sql
 SELECT current_database(), current_user;

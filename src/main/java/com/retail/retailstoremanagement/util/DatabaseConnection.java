@@ -27,11 +27,20 @@ public final class DatabaseConnection {
     }
 
     public static Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(
+        Connection connection = DriverManager.getConnection(
                 DatabaseConfig.getUrl(),
                 DatabaseConfig.getUser(),
                 DatabaseConfig.getPassword()
         );
+        Long storeId = TenantContext.getStoreId();
+        if (storeId != null) {
+            try (java.sql.PreparedStatement statement = connection.prepareStatement(
+                    "SELECT set_config('app.current_store_id', ?, false)")) {
+                statement.setString(1, storeId.toString());
+                statement.execute();
+            }
+        }
+        return connection;
     }
 
     public static boolean testConnection() {

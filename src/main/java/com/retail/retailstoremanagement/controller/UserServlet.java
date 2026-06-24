@@ -18,8 +18,9 @@ public class UserServlet extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         try {
-            req.setAttribute("users", service.findAll());
             AppUser current = (AppUser) req.getSession().getAttribute("currentUser");
+            req.setAttribute("users", current != null && current.getRole() == UserRole.ADMIN
+                    ? service.findAll() : java.util.List.of(current));
             req.setAttribute("currentUserId", current != null ? current.getId() : -1L);
             req.setAttribute("isAdmin", current != null && current.getRole() == UserRole.ADMIN);
             req.setAttribute("flashSuccess", RequestUtils.consumeFlash(req, "flashSuccess"));
@@ -52,12 +53,12 @@ public class UserServlet extends HttpServlet {
                     service.updateUser(
                         RequestUtils.requiredLong(req, "id"),
                         RequestUtils.text(req, "fullName"),
-                        RequestUtils.text(req, "role")
+                        RequestUtils.text(req, "role"),
+                        current
                     );
                     // Nếu admin đang sửa chính mình, cập nhật session
                     if (current != null && current.getId() == RequestUtils.requiredLong(req, "id")) {
                         current.setFullName(RequestUtils.text(req, "fullName"));
-                        current.setRole(UserRole.valueOf(RequestUtils.text(req, "role")));
                     }
                     RequestUtils.flash(req, "flashSuccess", "Đã cập nhật tài khoản.");
                     break;
@@ -76,6 +77,7 @@ public class UserServlet extends HttpServlet {
 
                 case "change-password":
                     if (current == null) throw new IllegalStateException("Chưa đăng nhập.");
+                    requireMatchingPasswords(req);
                     service.changeOwnPassword(
                         current.getId(),
                         req.getParameter("currentPassword"),
@@ -86,6 +88,7 @@ public class UserServlet extends HttpServlet {
 
                 case "reset-password":
                     requireAdmin(current);
+                    requireMatchingPasswords(req);
                     service.resetPassword(
                         RequestUtils.requiredLong(req, "id"),
                         req.getParameter("newPassword"),
@@ -115,5 +118,14 @@ public class UserServlet extends HttpServlet {
         if (user == null || user.getRole() != UserRole.ADMIN)
             throw new com.retail.retailstoremanagement.service.ValidationException(
                 "Chỉ quản trị viên được thực hiện thao tác này.");
+    }
+
+    private void requireMatchingPasswords(HttpServletRequest request) {
+        String newPassword = request.getParameter("newPassword");
+        String confirmation = request.getParameter("confirmPassword");
+        if (newPassword == null || !newPassword.equals(confirmation)) {
+            throw new com.retail.retailstoremanagement.service.ValidationException(
+                    "Mật khẩu xác nhận không khớp.");
+        }
     }
 }

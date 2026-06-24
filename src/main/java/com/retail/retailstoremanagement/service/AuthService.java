@@ -1,19 +1,46 @@
 package com.retail.retailstoremanagement.service;
 import com.retail.retailstoremanagement.dao.UserDao;
+import com.retail.retailstoremanagement.dao.StoreDao;
+import com.retail.retailstoremanagement.dao.impl.JdbcStoreDao;
 import com.retail.retailstoremanagement.model.AppUser;
 import com.retail.retailstoremanagement.model.UserRole;
 import org.mindrot.jbcrypt.BCrypt;
 import java.sql.SQLException;
 import java.util.List;
+import com.retail.retailstoremanagement.util.TenantContext;
 
 public class AuthService {
     private final UserDao dao;
-    public AuthService(UserDao dao) { this.dao = dao; }
+    private final StoreDao storeDao;
+    public AuthService(UserDao dao) { this(dao, new JdbcStoreDao()); }
+    public AuthService(UserDao dao, StoreDao storeDao) { this.dao = dao; this.storeDao = storeDao; }
 
-    public AppUser login(String username, String password) throws SQLException {
-        if (username == null || password == null) return null;
-        AppUser u = dao.findByUsername(username.trim());
-        return u != null && u.isActive() && BCrypt.checkpw(password, u.getPasswordHash()) ? u : null;
+    public AppUser login(String storeCode, String username, String password) throws SQLException {
+        if (storeCode == null || username == null || password == null) return null;
+        Long storeId = storeDao.findActiveIdByCode(storeCode.trim());
+        if (storeId == null) return null;
+        Long previousStoreId = TenantContext.getStoreId();
+        TenantContext.setStoreId(storeId);
+        try {
+            AppUser u = dao.findByUsername(username.trim());
+            return u != null && u.isActive() && BCrypt.checkpw(password, u.getPasswordHash()) ? u : null;
+        } finally {
+            if (previousStoreId == null) TenantContext.clear();
+            else TenantContext.setStoreId(previousStoreId);
+        }
+    }
+
+    public AppUser registerStore(String storeCode, String storeName, String phone, String address,
+                                 String username, String password, String fullName)
+            throws SQLException {
+        if (storeCode == null || !storeCode.trim().matches("[A-Za-z0-9_-]{3,30}"))
+            throw new ValidationException("Mã cửa hàng cần 3–30 ký tự, không có khoảng trắng.");
+        if (storeName == null || storeName.trim().length() < 2)
+            throw new ValidationException("Vui lòng nhập tên cửa hàng.");
+        validate(username, password, fullName);
+        return storeDao.register(storeCode.trim().toUpperCase(), storeName.trim(),
+                phone == null ? null : phone.trim(), address == null ? null : address.trim(),
+                username.trim(), BCrypt.hashpw(password, BCrypt.gensalt(12)), fullName.trim());
     }
 
     public boolean needsSetup() throws SQLException { return dao.count() == 0; }
@@ -36,12 +63,16 @@ public class AuthService {
         return dao.create(username.trim(), BCrypt.hashpw(password, BCrypt.gensalt(12)), fullName.trim(), userRole);
     }
 
-    public AppUser updateUser(long id, String fullName, String role) throws SQLException {
+    public AppUser updateUser(long id, String fullName, String role, AppUser currentUser) throws SQLException {
         if (fullName == null || fullName.trim().length() < 2)
             throw new ValidationException("Vui lòng nhập họ tên.");
         UserRole userRole;
         try { userRole = UserRole.valueOf(role); }
         catch (Exception e) { throw new ValidationException("Vai trò không hợp lệ."); }
+        if (currentUser != null && currentUser.getId() == id
+                && currentUser.getRole() == UserRole.ADMIN && userRole != UserRole.ADMIN) {
+            throw new ValidationException("Không thể tự hạ quyền tài khoản đang đăng nhập.");
+        }
         return dao.update(id, fullName.trim(), userRole);
     }
 

@@ -1,3 +1,4 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" isELIgnored="true" %>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -6,7 +7,7 @@
     <title>Bán Hàng (POS) - Cửa Hàng Bán Lẻ</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="<%= request.getContextPath() %>/assets/css/style.css">
     <style>
         /* POS-specific styles */
         body { overflow: hidden; }
@@ -224,11 +225,6 @@
             padding: 12px;
             text-align: center;
         }
-        #discountTypeAmountBtn.active, #discountTypePercentBtn.active {
-            background: #3b82f6;
-            color: #fff;
-            border-color: #3b82f6;
-        }
     </style>
 </head>
 <body>
@@ -315,15 +311,16 @@
 
                     <div class="mb-2">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="text-muted">Giảm giá:</span>
+                            <span class="text-muted">Mã giảm giá:</span>
                             <span class="fw-semibold text-success" id="discountAmountDisplay">0 đ</span>
                         </div>
                         <div class="input-group input-group-sm">
-                            <button type="button" class="btn btn-outline-secondary active" id="discountTypeAmountBtn" onclick="setDiscountType('AMOUNT')">đ</button>
-                            <button type="button" class="btn btn-outline-secondary" id="discountTypePercentBtn" onclick="setDiscountType('PERCENT')">%</button>
-                            <input type="text" id="discountInput" class="form-control text-end" placeholder="0" oninput="onDiscountInput(this)">
+                            <span class="input-group-text bg-white"><i class="fa-solid fa-ticket text-muted"></i></span>
+                            <input type="text" id="discountCodeInput" class="form-control text-uppercase"
+                                   placeholder="Ví dụ: SALE10" oninput="onDiscountCodeInput(this)">
+                            <button type="button" class="btn btn-outline-primary" onclick="applyDiscountCode()">Áp dụng</button>
                         </div>
-                        <div class="invalid-feedback" id="discountError">Giá trị giảm giá không hợp lệ.</div>
+                        <div class="small mt-1 d-none" id="discountFeedback"></div>
                     </div>
 
                     <div class="d-flex justify-content-between mb-3">
@@ -406,9 +403,9 @@
                     <button class="btn btn-secondary px-4" data-bs-dismiss="modal">
                         <i class="fa-solid fa-xmark me-1"></i>Đóng
                     </button>
-                    <button class="btn btn-primary px-4" onclick="alert('Đang in hóa đơn...')">
+                    <a class="btn btn-primary px-4" id="printInvoiceBtn" target="_blank" href="#">
                         <i class="fa-solid fa-print me-1"></i>In hóa đơn
-                    </button>
+                    </a>
                 </div>
             </div>
         </div>
@@ -418,11 +415,11 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // ---- Load Sidebar ----
-fetch('common/sidebar')
+fetch('<%= request.getContextPath() %>/common/sidebar')
     .then(r => r.text())
     .then(html => {
         document.getElementById('sidebar-placeholder').outerHTML = html;
-        const link = document.querySelector('.sidebar-nav a[href$="/sale.html"]');
+        const link = document.querySelector('.sidebar-nav a[href$="/sale"]');
         if (link) link.classList.add('active');
     });
 
@@ -466,7 +463,7 @@ function renderProducts(list) {
 }
 async function loadProducts() {
     try {
-        const response = await fetch('api/products/sale');
+        const response = await fetch('<%= request.getContextPath() %>/api/products/sale');
         if (!response.ok) throw new Error('Không tải được sản phẩm.');
         PRODUCTS = await response.json(); renderProducts(PRODUCTS);
         const categories = [...new Set(PRODUCTS.map(p => p.cat))];
@@ -481,8 +478,8 @@ loadProducts();
 // ============================================================
 let cart = {}; // { id: { ...product, qty } }
 let cartTotal = 0;       // tạm tính (subtotal trước giảm giá)
-let discountType = 'AMOUNT'; // 'AMOUNT' (đ) hoặc 'PERCENT' (%)
-let discountValue = 0;
+let appliedDiscountCode = '';
+let appliedDiscountAmount = 0;
 let grandTotal = 0;      // tổng tiền sau giảm giá
 let paymentMethod = 'cash';
 let selectedCustomer = null;
@@ -490,7 +487,7 @@ let csrfToken = null;
 
 async function ensureSecurityContext() {
     if (csrfToken) return;
-    const response = await fetch('api/session');
+    const response = await fetch('<%= request.getContextPath() %>/api/session');
     if (!response.ok) throw new Error('Phiên đăng nhập đã hết hạn.');
     csrfToken = (await response.json()).csrfToken;
 }
@@ -517,7 +514,7 @@ async function lookupCustomer() {
     }
 
     try {
-        const response = await fetch(`api/customers/lookup?code=${encodeURIComponent(code)}`);
+        const response = await fetch('<%= request.getContextPath() %>/api/customers/lookup?code=' + encodeURIComponent(code));
         if (!response.ok) throw new Error('Lookup failed');
         const data = await response.json();
         if (!data.found) {
@@ -583,12 +580,7 @@ function removeItem(id) { delete cart[id]; renderCart(); }
 
 function clearCart() {
     cart = {};
-    discountValue = 0;
-    discountType = 'AMOUNT';
-    document.getElementById('discountInput').value = '';
-    document.getElementById('discountInput').classList.remove('is-invalid');
-    document.getElementById('discountTypeAmountBtn').classList.add('active');
-    document.getElementById('discountTypePercentBtn').classList.remove('active');
+    clearAppliedDiscount(true);
     renderCart();
     document.getElementById('cashInput').value = '';
     document.getElementById('cashInput').classList.remove('is-invalid');
@@ -632,44 +624,71 @@ function renderCart() {
     document.getElementById('cartCount').textContent = `${keys.length} mặt hàng`;
     document.getElementById('summaryItemCount').textContent = keys.length;
     document.getElementById('subtotalAmount').textContent = fmt(cartTotal);
+    if (appliedDiscountCode) clearAppliedDiscount(false);
     updateTotals();
 }
 
 // ============================================================
-//  DISCOUNT — % hoặc số tiền cố định, tính lại tổng tiền
+//  DISCOUNT CODE — backend kiểm tra điều kiện và tính giá trị
 // ============================================================
-function setDiscountType(type) {
-    discountType = type;
-    document.getElementById('discountTypeAmountBtn').classList.toggle('active', type === 'AMOUNT');
-    document.getElementById('discountTypePercentBtn').classList.toggle('active', type === 'PERCENT');
+function onDiscountCodeInput(el) {
+    el.value = el.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+    if (el.value !== appliedDiscountCode) clearAppliedDiscount(false);
+}
+
+function clearAppliedDiscount(clearInput) {
+    appliedDiscountCode = '';
+    appliedDiscountAmount = 0;
+    const input = document.getElementById('discountCodeInput');
+    input.classList.remove('is-valid', 'is-invalid');
+    if (clearInput) input.value = '';
+    document.getElementById('discountFeedback').classList.add('d-none');
     updateTotals();
 }
 
-function onDiscountInput(el) {
-    const raw = el.value.replace(',', '.').trim();
-    const n = parseFloat(raw);
-    discountValue = isNaN(n) || n < 0 ? 0 : n;
-    el.classList.remove('is-invalid');
-    if (discountType === 'PERCENT' && discountValue > 100) {
-        discountValue = 100;
-        el.value = '100';
-        el.classList.add('is-invalid');
-        document.getElementById('discountError').textContent = 'Tối đa 100%.';
+async function applyDiscountCode() {
+    const input = document.getElementById('discountCodeInput');
+    const feedback = document.getElementById('discountFeedback');
+    const code = input.value.trim().toUpperCase();
+    input.classList.remove('is-valid', 'is-invalid');
+    feedback.classList.remove('d-none', 'text-success', 'text-danger');
+    if (!code) {
+        clearAppliedDiscount(false);
+        return;
     }
-    updateTotals();
-}
-
-function calculateDiscount() {
-    if (!discountValue || discountValue <= 0) return 0;
-    let amount = discountType === 'PERCENT' ? cartTotal * discountValue / 100 : discountValue;
-    if (amount > cartTotal) amount = cartTotal;
-    return Math.round(amount);
+    if (cartTotal <= 0) {
+        input.classList.add('is-invalid');
+        feedback.textContent = 'Hãy thêm sản phẩm trước khi áp dụng mã.';
+        feedback.classList.add('text-danger');
+        return;
+    }
+    try {
+        const url = '<%= request.getContextPath() %>/api/discount-codes/validate?code='
+            + encodeURIComponent(code) + '&subtotal=' + encodeURIComponent(cartTotal);
+        const response = await fetch(url);
+        const result = await response.json();
+        if (!response.ok || !result.valid) throw new Error(result.message || 'Mã không hợp lệ.');
+        appliedDiscountCode = result.code;
+        appliedDiscountAmount = Number(result.discount) || 0;
+        input.value = result.code;
+        input.classList.add('is-valid');
+        feedback.textContent = result.name + ' · Giảm ' + fmt(appliedDiscountAmount);
+        feedback.classList.add('text-success');
+        updateTotals();
+    } catch (error) {
+        appliedDiscountCode = '';
+        appliedDiscountAmount = 0;
+        input.classList.add('is-invalid');
+        feedback.textContent = error.message;
+        feedback.classList.add('text-danger');
+        updateTotals();
+    }
 }
 
 function updateTotals() {
-    const discountAmount = calculateDiscount();
-    grandTotal = Math.max(0, cartTotal - discountAmount);
-    document.getElementById('discountAmountDisplay').textContent = discountAmount > 0 ? `- ${fmt(discountAmount)}` : fmt(0);
+    grandTotal = Math.max(0, cartTotal - appliedDiscountAmount);
+    document.getElementById('discountAmountDisplay').textContent =
+        appliedDiscountAmount > 0 ? `- ${fmt(appliedDiscountAmount)}` : fmt(0);
     document.getElementById('totalAmount').textContent = fmt(grandTotal);
 
     // Recalculate change against tổng tiền sau giảm giá
@@ -711,22 +730,39 @@ async function checkout() {
         cashEl.classList.add('is-invalid'); return;
     }
     cashEl.classList.remove('is-invalid');
+    const enteredCode = document.getElementById('discountCodeInput').value.trim();
+    if (enteredCode && enteredCode !== appliedDiscountCode) {
+        alert('Vui lòng nhấn Áp dụng để kiểm tra mã giảm giá.'); return;
+    }
+    await submitCheckout();
+}
+
+async function submitCheckout() {
+    const customerCode = document.getElementById('customerCodeInput').value.trim();
+    const cashRaw = document.getElementById('cashInput').value.replace(/\D/g,'');
+    const cash = parseInt(cashRaw) || 0;
+    const cashEl = document.getElementById('cashInput');
     const body = new URLSearchParams();
     Object.values(cart).forEach(item => { body.append('productCode', item.id); body.append('quantity', item.qty); });
     body.set('customerCode', customerCode); body.set('paymentMethod', paymentMethod.toUpperCase());
     body.set('csrfToken', csrfToken);
-    body.set('discountType', discountType); body.set('discountValue', discountValue || 0);
+    if (appliedDiscountCode) body.set('discountCode', appliedDiscountCode);
     if (paymentMethod === 'cash') body.set('cashReceived', cash);
     const button = document.querySelector('.checkout-btn'); button.disabled = true;
     try {
-        const response = await fetch('api/checkout', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}, body});
+        const response = await fetch('<%= request.getContextPath() %>/api/checkout', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}, body});
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.message || 'Thanh toán thất bại.');
         const discountLine = result.discount > 0 ? `<br>Giảm giá: <strong class="text-success">- ${fmt(result.discount)}</strong>` : '';
         document.getElementById('successMsg').innerHTML = `Hóa đơn <strong>${result.code}</strong> đã được lưu.${discountLine}<br>Tổng tiền: <strong class="text-danger">${fmt(result.total)}</strong>${result.change == null ? '' : `<br>Tiền thối: <strong class="text-success">${fmt(result.change)}</strong>`}`;
+        document.getElementById('printInvoiceBtn').href =
+            '<%= request.getContextPath() %>/invoices/print?id=' + result.invoiceId;
         bootstrap.Modal.getOrCreateInstance(document.getElementById('successModal')).show(); clearCart(); cashEl.value=''; await loadProducts();
-    } catch (error) { alert(error.message); }
-    finally { button.disabled = false; }
+    } catch (error) {
+        alert(error.message);
+    } finally {
+        button.disabled = false;
+    }
 }
 
 // ============================================================

@@ -25,6 +25,19 @@ erDiagram
 
 ## Tables
 
+### `stores`
+
+Represents one independent store/tenant. Users and all business records belong to a store through `store_id`.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | BIGSERIAL | Primary key |
+| `code` | VARCHAR(30) | Unique code used during login |
+| `name` | VARCHAR(150) | Store display name |
+| `phone` | VARCHAR(20) | Optional contact phone |
+| `address` | VARCHAR(500) | Optional address |
+| `active` | BOOLEAN | Store status |
+
 ### `app_users`
 
 Stores application accounts.
@@ -37,6 +50,8 @@ Stores application accounts.
 | `full_name` | VARCHAR(120) | Employee name |
 | `role` | VARCHAR(20) | `ADMIN` or `CASHIER` |
 | `active` | BOOLEAN | Account status |
+| `auth_version` | INTEGER | Invalidates existing sessions after security-sensitive changes |
+| `store_id` | BIGINT | Tenant owner, FK to `stores` |
 
 ### `categories`
 
@@ -62,6 +77,38 @@ Stores supplier contact information.
 | `phone`, `email` | VARCHAR | Contact information |
 | `address` | VARCHAR(500) | Supplier address |
 | `active` | BOOLEAN | Supplier status |
+
+### `purchase_orders`
+
+Stores multi-product stock receipts. A `DRAFT` order does not change inventory;
+`COMPLETED` adds stock and `CANCELLED` reverses a completed receipt when enough
+stock remains.
+
+| Column | Type | Description |
+|---|---|---|
+| `id`, `store_id` | BIGINT | Tenant-scoped identifier |
+| `code` | VARCHAR(20) | Receipt code, e.g. `PN001` |
+| `supplier_id` | BIGINT | Supplier |
+| `created_by` | BIGINT | User who created the receipt |
+| `status` | VARCHAR(20) | `DRAFT`, `COMPLETED`, `CANCELLED` |
+| `total_amount` | NUMERIC | Sum of receipt details |
+| `completed_at`, `cancelled_at` | TIMESTAMPTZ | Workflow timestamps |
+| `cancelled_by` | BIGINT | User who cancelled the receipt |
+
+### `discount_codes`
+
+Stores tenant-scoped promotion codes used by POS checkout.
+
+| Column | Type | Description |
+|---|---|---|
+| `code` | VARCHAR(40) | Unique code inside one store |
+| `discount_type` | VARCHAR(20) | `PERCENT` or `AMOUNT` |
+| `discount_value` | NUMERIC | Percentage or fixed amount |
+| `minimum_order` | NUMERIC | Required order subtotal |
+| `maximum_discount` | NUMERIC | Optional cap for percentage discounts |
+| `starts_at`, `ends_at` | TIMESTAMPTZ | Optional validity window |
+| `usage_limit`, `used_count` | INTEGER | Optional global usage limit |
+| `active` | BOOLEAN | Soft-lock status |
 
 ### `products`
 

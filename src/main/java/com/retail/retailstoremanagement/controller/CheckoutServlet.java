@@ -23,11 +23,9 @@ public class CheckoutServlet extends HttpServlet {
             Map<String,Integer> items=new LinkedHashMap<>();
             for(int i=0;i<codes.length;i++)items.merge(codes[i],Integer.parseInt(quantities[i]),Integer::sum);
             String cashText=req.getParameter("cashReceived"); BigDecimal cash=cashText==null||cashText.isBlank()?null:new BigDecimal(cashText);
-            String discountValueText=req.getParameter("discountValue");
-            BigDecimal discountValue=discountValueText==null||discountValueText.isBlank()?null:new BigDecimal(discountValueText);
             AppUser user=(AppUser)req.getSession().getAttribute("currentUser");
             Invoice invoice=service.checkout(items,req.getParameter("customerCode"),req.getParameter("paymentMethod"),cash,
-                    req.getParameter("discountType"),discountValue,user==null?null:user.getId());
+                    req.getParameter("discountCode"),user);
             resp.getWriter().printf("{\"success\":true,\"invoiceId\":%d,\"code\":\"%s\",\"subtotal\":%s,\"discount\":%s,\"total\":%s,\"change\":%s}",
                     invoice.getId(),JsonUtils.escape(invoice.getCode()),invoice.getSubtotal(),invoice.getDiscountAmount(),
                     invoice.getTotalAmount(),invoice.getChangeAmount()==null?"null":invoice.getChangeAmount());

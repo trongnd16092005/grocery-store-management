@@ -12,6 +12,7 @@ public final class DatabaseConnectionSmokeTest {
     }
 
     public static void main(String[] args) throws Exception {
+        TestTenantContext.activateDefaultStore();
         String sql = "SELECT current_database(), current_user, COUNT(*) FROM products "
                 + "GROUP BY current_database(), current_user";
 

@@ -8,12 +8,15 @@ import java.util.List;
 public class PurchaseOrder extends BaseEntity {
     private String code;
     private Long supplierId;
+    private String supplierName;
     private Long createdBy;
+    private String createdByName;
     private PurchaseOrderStatus status = PurchaseOrderStatus.DRAFT;
     private BigDecimal totalAmount = BigDecimal.ZERO;
     private String note;
     private OffsetDateTime createdAt;
     private OffsetDateTime completedAt;
+    private OffsetDateTime cancelledAt;
     private List<PurchaseOrderDetail> details = new ArrayList<>();
 
     public String getCode() {
@@ -32,12 +35,28 @@ public class PurchaseOrder extends BaseEntity {
         this.supplierId = supplierId;
     }
 
+    public String getSupplierName() {
+        return supplierName;
+    }
+
+    public void setSupplierName(String supplierName) {
+        this.supplierName = supplierName;
+    }
+
     public Long getCreatedBy() {
         return createdBy;
     }
 
     public void setCreatedBy(Long createdBy) {
         this.createdBy = createdBy;
+    }
+
+    public String getCreatedByName() {
+        return createdByName;
+    }
+
+    public void setCreatedByName(String createdByName) {
+        this.createdByName = createdByName;
     }
 
     public PurchaseOrderStatus getStatus() {
@@ -78,6 +97,14 @@ public class PurchaseOrder extends BaseEntity {
 
     public void setCompletedAt(OffsetDateTime completedAt) {
         this.completedAt = completedAt;
+    }
+
+    public OffsetDateTime getCancelledAt() {
+        return cancelledAt;
+    }
+
+    public void setCancelledAt(OffsetDateTime cancelledAt) {
+        this.cancelledAt = cancelledAt;
     }
 
     public List<PurchaseOrderDetail> getDetails() {

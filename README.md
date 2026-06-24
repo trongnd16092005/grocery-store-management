@@ -4,6 +4,7 @@
 
 ## Chức năng chính
 
+- Đăng ký và vận hành nhiều cửa hàng độc lập trên cùng hệ thống.
 - Quản lý sản phẩm, danh mục, khách hàng và tồn kho.
 - Nhập hàng, điều chỉnh tồn, cảnh báo tồn tối thiểu và lịch sử kho.
 - Bán hàng POS, thanh toán tiền mặt hoặc giao diện QR dự phòng.
@@ -37,6 +38,12 @@ Kết nối Query Tool vào chính database `grocery_store`, sau đó chạy mig
 1. `database/migrations/V1__create_schema.sql`
 2. `database/migrations/V2__seed_demo_data.sql`
 3. `database/migrations/V3__business_code_sequences.sql`
+4. `database/migrations/V4__add_user_auth_version.sql`
+5. `database/migrations/V5__seed_additional_products.sql`
+6. `database/migrations/V6__multi_store_tenancy.sql`
+7. `database/migrations/V7__enforce_tenant_foreign_keys.sql`
+8. `database/migrations/V8__purchase_orders_discount_approval.sql`
+9. `database/migrations/V9__discount_codes.sql`
 
 Không chạy migration trên database mặc định `postgres`.
 
@@ -48,7 +55,7 @@ SELECT COUNT(*) FROM products;
 SELECT COUNT(*) FROM customers;
 ```
 
-Kết quả seed hiện tại tương ứng là 4 danh mục, 8 sản phẩm và 6 khách hàng.
+Sau khi chạy đầy đủ V1–V5, dữ liệu mẫu có 4 danh mục, 20 sản phẩm và 6 khách hàng.
 
 ## 2. Thêm Tomcat vào IntelliJ
 
@@ -109,7 +116,7 @@ Nhấn Run ở cấu hình Tomcat và mở:
 http://localhost:8080/grocery-store/
 ```
 
-Lần chạy đầu, nếu bảng `app_users` chưa có tài khoản, ứng dụng chuyển tới `/setup`. Tạo tài khoản quản trị viên tại đây; mật khẩu được băm BCrypt trước khi lưu. Sau khi có tài khoản đầu tiên, trang setup tự khóa.
+Mỗi cửa hàng đăng ký tại `/register`. Hệ thống tạo cửa hàng và tài khoản ADMIN đầu tiên trong cùng một transaction; mật khẩu được băm BCrypt trước khi lưu.
 
 ## Build WAR bằng Maven
 
@@ -130,7 +137,19 @@ Thư mục `target/` là kết quả build và không được đưa lên Git.
 ## Phân quyền
 
 - `ADMIN`: dashboard, sản phẩm, danh mục, kho, tài khoản, khách hàng, bán hàng, xem và hủy hóa đơn.
-- `CASHIER`: dashboard, khách hàng, bán hàng và xem hóa đơn; không được quản lý kho hoặc hủy hóa đơn.
+- `CASHIER`: dashboard, khách hàng, bán hàng, xem hóa đơn và tự đổi mật khẩu; không được quản lý kho hoặc hủy hóa đơn.
+
+Khi tài khoản bị khóa, đổi vai trò hoặc đổi/reset mật khẩu, mọi session cũ của tài khoản đó sẽ bị vô hiệu hóa ở request tiếp theo. Hệ thống cũng ngăn tự hạ quyền, tự khóa và ngăn khóa/hạ quyền quản trị viên đang hoạt động cuối cùng.
+
+## Mô hình nhiều cửa hàng
+
+- Truy cập `/register` để tạo cửa hàng và ADMIN đầu tiên.
+- Khi đăng nhập cần nhập `mã cửa hàng`, tên đăng nhập và mật khẩu.
+- Mỗi cửa hàng có thể tạo nhiều ADMIN và CASHIER trong mục Tài khoản.
+- Sản phẩm, danh mục, nhà cung cấp, khách hàng, kho, phiếu nhập và hóa đơn đều thuộc một `store_id`.
+- PostgreSQL Row-Level Security tự giới hạn mọi truy vấn theo cửa hàng hiện tại.
+- Khóa ngoại kép `(id, store_id)` ngăn liên kết dữ liệu giữa hai cửa hàng ngay cả khi request giả mạo ID.
+- Dữ liệu cũ được giữ trong cửa hàng mặc định có mã `CUAHANGABC`.
 
 Thanh toán POS và hủy hóa đơn chạy trong transaction PostgreSQL, khóa bản ghi tồn kho và ghi lịch sử `SALE`/`CANCEL_SALE`.
 
@@ -183,16 +202,29 @@ Tải lại trang và đăng nhập lại nếu phiên đã hết hạn.
 
 ### 2026-06-23
 
-- Xoá các file HTML prototype cũ ở `src/main/webapp/` (`products.html`, `categories.html`, `customers.html`, `inventory.html`, `invoices.html`) vì các module này đã chuyển sang Servlet + JSP lấy dữ liệu trực tiếp từ PostgreSQL. `AuthFilter` vẫn giữ bảng redirect các URL `.html` cũ sang route mới nên link/bookmark cũ không bị lỗi 404.
-- `sale.html` được giữ lại vì trang Bán hàng (POS) vẫn đang dùng kiến trúc HTML tĩnh + AJAX gọi `/api/products/sale`, `/api/checkout`, `/api/customers/lookup`.
+- Xoá các file HTML prototype cũ ở `src/main/webapp/`; mọi màn hình nghiệp vụ hiện được phục vụ qua Servlet + JSP trong `WEB-INF/views`.
+- POS được phục vụ tại route `/sale` bởi `SaleServlet` và `sale.jsp`; JavaScript trong JSP gọi `/api/products/sale`, `/api/checkout`, `/api/customers/lookup`.
 - **Thêm giảm giá hóa đơn** (cột `discount_amount` đã có sẵn trong bảng `invoices` nhưng chưa được dùng):
-  - `sale.html`: thêm ô nhập giảm giá theo **%** hoặc **số tiền (đ)** trong khung tóm tắt giỏ hàng, hiển thị Tạm tính / Giảm giá / Tổng tiền riêng biệt; tiền thối và điều kiện thanh toán tiền mặt được tính lại theo tổng tiền sau giảm giá.
-  - `CheckoutServlet`: nhận thêm `discountType` và `discountValue` từ form, trả về `subtotal`/`discount`/`total` trong JSON response.
-  - `InvoiceService.checkout`: validate giá trị giảm giá (không âm, % không vượt 100), giữ overload cũ (không có giảm giá) để tương thích code/test hiện có.
-  - `InvoiceDao` / `JdbcInvoiceDao`: số tiền giảm giá được **tính lại ở backend** dựa trên subtotal đã chốt giá từ DB (không tin số FE gửi lên), lưu vào cột `discount_amount`, và `total_amount` = subtotal − discount.
+  - `sale.jsp`: thêm ô nhập giảm giá theo **%** hoặc **số tiền (đ)** trong khung tóm tắt giỏ hàng, hiển thị Tạm tính / Giảm giá / Tổng tiền riêng biệt; tiền thối và điều kiện thanh toán tiền mặt được tính lại theo tổng tiền sau giảm giá.
+  - POS nhập mã khuyến mãi và backend tự kiểm tra điều kiện trước khi thanh toán.
+  - `InvoiceDao` / `JdbcInvoiceDao`: số tiền giảm giá được **tính lại ở backend**
+    dựa trên subtotal đã chốt từ DB, không tin số tiền phía giao diện gửi lên.
+
+### 2026-06-25
+
+- **Nhà cung cấp**: ADMIN quản lý tại `/suppliers`, gồm thêm, sửa, tìm kiếm,
+  khóa/mở khóa và xem số sản phẩm đang liên kết. Dữ liệu được tách theo từng cửa hàng.
+- **Thông tin cửa hàng**: ADMIN cập nhật tên, số điện thoại và địa chỉ tại `/store`.
+  Mã cửa hàng được giữ cố định vì được dùng trong quá trình đăng nhập.
+- **Phiếu nhập nhiều sản phẩm**: tạo phiếu nháp tại `/purchase-orders`, sau đó
+  hoàn thành để cộng tồn hoặc hủy để hoàn tác tồn kho.
+- **Mã giảm giá**: ADMIN quản lý tại `/discount-codes`; hỗ trợ giảm theo phần trăm
+  hoặc số tiền, đơn tối thiểu, mức giảm tối đa, thời hạn và giới hạn lượt sử dụng.
+  POS chỉ nhận mã hợp lệ và hóa đơn lưu lại mã đã dùng.
+- **In hóa đơn**: trang `/invoices/print?id=...` cung cấp mẫu receipt 80 mm lấy
+  trực tiếp dữ liệu hóa đơn đã lưu trong PostgreSQL.
 
 ## Việc còn thiếu / chưa hoàn thiện
 
-- **Thanh toán QR**: chỉ có giao diện ở `sale.html`, `CheckoutServlet` chưa sinh mã QR động hay tích hợp cổng thanh toán nào — payment method "qr" hiện được lưu như một chuỗi text, xử lý giống tiền mặt.
-- **Supplier / Purchase Order**: có model và DAO nhưng chưa có Service/Servlet/trang riêng để quản lý nhà cung cấp hay xem lịch sử đơn nhập hàng; hiện chỉ dùng nội bộ khi nhập kho.
+- **Thanh toán QR**: chỉ có giao diện ở `sale.jsp`, `CheckoutServlet` chưa sinh mã QR động hay tích hợp cổng thanh toán nào.
 - **Test**: mới có vài "smoke test" dạng `main()` chạy tay (`src/test/java/.../*SmokeTest.java`), cần kết nối DB thật, chưa phải unit test tự động hay CI.
