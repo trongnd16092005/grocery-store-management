@@ -3,6 +3,7 @@ package com.retail.retailstoremanagement.service;
 import com.retail.retailstoremanagement.dao.impl.*;
 import com.retail.retailstoremanagement.model.*;
 import com.retail.retailstoremanagement.util.DatabaseConnection;
+import com.retail.retailstoremanagement.util.TestTenantContext;
 import java.math.BigDecimal;
 import java.sql.*;
 import java.util.Map;
@@ -10,6 +11,7 @@ import java.util.Map;
 /** Manual integration test; all temporary records are removed. */
 public final class SalesAuthSmokeTest {
     public static void main(String[] args)throws Exception{
+        TestTenantContext.activateDefaultStore();
         Category category=new Category(); Product product=new Product(); Invoice invoice=null; Long tempUserId=null;
         CategoryService categories=new CategoryService(); ProductService products=new ProductService();
         try{
@@ -23,7 +25,7 @@ public final class SalesAuthSmokeTest {
             if(products.findById(product.getId()).getStockQuantity()!=5)throw new IllegalStateException("Cancellation did not restore stock.");
             try{invoices.cancel(invoice.getId(),null);throw new IllegalStateException("Invoice was cancelled twice.");}catch(SQLException expected){/* correct */}
             JdbcUserDao userDao=new JdbcUserDao();
-            if(userDao.count()==0){AuthService auth=new AuthService(userDao);AppUser u=auth.setupAdmin("smoke_admin","Temporary123!","Smoke Admin");tempUserId=u.getId();if(auth.login("smoke_admin","Temporary123!")==null)throw new IllegalStateException("BCrypt login failed.");}
+            if(userDao.count()==0){AuthService auth=new AuthService(userDao);AppUser u=auth.setupAdmin("smoke_admin","Temporary123!","Smoke Admin");tempUserId=u.getId();if(auth.login("CUAHANGABC","smoke_admin","Temporary123!")==null)throw new IllegalStateException("BCrypt login failed.");}
             System.out.printf("salesAuthSmoke=true, invoice=%s, restoredStock=5%n",invoice.getCode());
         }finally{cleanup(invoice==null?null:invoice.getId(),product.getId(),category.getId(),tempUserId);}
     }

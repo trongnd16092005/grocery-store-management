@@ -7,6 +7,7 @@ import com.retail.retailstoremanagement.model.CustomerType;
 import com.retail.retailstoremanagement.model.Product;
 import com.retail.retailstoremanagement.model.Supplier;
 import com.retail.retailstoremanagement.util.DatabaseConnection;
+import com.retail.retailstoremanagement.util.TestTenantContext;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -20,6 +21,7 @@ public final class BackendWriteSmokeTest {
     }
 
     public static void main(String[] args) throws Exception {
+        TestTenantContext.activateDefaultStore();
         CategoryService categoryService = new CategoryService();
         ProductService productService = new ProductService();
         CustomerService customerService = new CustomerService();

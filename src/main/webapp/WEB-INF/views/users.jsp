@@ -15,7 +15,7 @@
   <div id="sidebar-placeholder"></div>
   <main class="main-content">
     <div class="topbar d-flex justify-content-between align-items-center">
-      <h1 class="h4 m-0 fw-bold">🔐 Tài khoản &amp; phân quyền</h1>
+      <h1 class="h4 m-0 fw-bold">${isAdmin ? '🔐 Tài khoản & phân quyền' : '🔑 Bảo mật tài khoản'}</h1>
       <div class="d-flex gap-2">
         <%-- Nút đổi mật khẩu — hiển thị với mọi user --%>
         <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#changePwModal">
@@ -42,6 +42,7 @@
         </div>
       </c:if>
 
+      <c:if test="${isAdmin}">
       <div class="card border-0 shadow-sm">
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
@@ -119,6 +120,7 @@
           </table>
         </div>
       </div>
+      </c:if>
     </div>
   </main>
 </div>
@@ -251,7 +253,7 @@
           </div>
           <div>
             <label class="form-label">Xác nhận mật khẩu mới</label>
-            <input type="password" class="form-control" id="rpConfirm" required minlength="8">
+            <input type="password" class="form-control" name="confirmPassword" id="rpConfirm" required minlength="8">
           </div>
         </div>
         <div class="modal-footer">

@@ -3,6 +3,7 @@ package com.retail.retailstoremanagement.controller;
 import com.retail.retailstoremanagement.dao.SupplierDao;
 import com.retail.retailstoremanagement.dao.impl.JdbcSupplierDao;
 import com.retail.retailstoremanagement.model.Product;
+import com.retail.retailstoremanagement.model.AppUser;
 import com.retail.retailstoremanagement.service.InventoryService;
 import com.retail.retailstoremanagement.service.ProductService;
 import com.retail.retailstoremanagement.service.ValidationException;
@@ -51,6 +52,7 @@ public class InventoryServlet extends HttpServlet {
             throws ServletException, IOException {
         request.setCharacterEncoding("UTF-8");
         String action = RequestUtils.text(request, "action");
+        AppUser currentUser = (AppUser) request.getSession().getAttribute("currentUser");
         try {
             if ("import".equals(action)) {
                 inventoryService.importStock(
@@ -59,7 +61,7 @@ public class InventoryServlet extends HttpServlet {
                         RequestUtils.decimal(request, "unitCost"),
                         RequestUtils.requiredLong(request, "supplierId"),
                         RequestUtils.text(request, "note"),
-                        null
+                        currentUser == null ? null : currentUser.getId()
                 );
                 RequestUtils.flash(request, "flashSuccess", "Đã nhập hàng và cập nhật tồn kho.");
             } else if ("adjust".equals(action)) {
@@ -67,7 +69,7 @@ public class InventoryServlet extends HttpServlet {
                         RequestUtils.requiredLong(request, "productId"),
                         RequestUtils.integer(request, "newStock", -1),
                         RequestUtils.text(request, "reason"),
-                        null
+                        currentUser == null ? null : currentUser.getId()
                 );
                 RequestUtils.flash(request, "flashSuccess", "Đã điều chỉnh tồn kho.");
             } else {

@@ -1,6 +1,7 @@
 package com.retail.retailstoremanagement.service;
 
 import com.retail.retailstoremanagement.dao.impl.JdbcDashboardDao;
+import com.retail.retailstoremanagement.util.TestTenantContext;
 
 /**
  * Read-only integration smoke test for modules 4-6.
@@ -11,6 +12,7 @@ public final class BackendModuleSmokeTest {
     }
 
     public static void main(String[] args) throws Exception {
+        TestTenantContext.activateDefaultStore();
         CategoryService categoryService = new CategoryService();
         ProductService productService = new ProductService();
         CustomerService customerService = new CustomerService();
@@ -24,7 +26,8 @@ public final class BackendModuleSmokeTest {
         int historyCount = inventoryService.findRecentTransactions(30).size();
         long dashboardProducts = new JdbcDashboardDao().load().getProductCount();
 
-        if (categoryCount != 4 || productCount != 8 || !customerFound) {
+        if (categoryCount < 4 || productCount < 20 || dashboardProducts != productCount
+                || !customerFound) {
             throw new IllegalStateException("Unexpected demo data returned by backend modules.");
         }
 

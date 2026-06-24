@@ -6,6 +6,10 @@ public class AppUser extends AuditableEntity {
     private String fullName;
     private UserRole role = UserRole.CASHIER;
     private boolean active = true;
+    private int authVersion;
+    private Long storeId;
+    private String storeCode;
+    private String storeName;
 
     public String getUsername() {
         return username;
@@ -46,4 +50,19 @@ public class AppUser extends AuditableEntity {
     public void setActive(boolean active) {
         this.active = active;
     }
+
+    public int getAuthVersion() {
+        return authVersion;
+    }
+
+    public void setAuthVersion(int authVersion) {
+        this.authVersion = authVersion;
+    }
+
+    public Long getStoreId() { return storeId; }
+    public void setStoreId(Long storeId) { this.storeId = storeId; }
+    public String getStoreCode() { return storeCode; }
+    public void setStoreCode(String storeCode) { this.storeCode = storeCode; }
+    public String getStoreName() { return storeName; }
+    public void setStoreName(String storeName) { this.storeName = storeName; }
 }
