@@ -30,6 +30,10 @@ public final class DatabaseConfig {
         return password;
     }
 
+    public static String getSuperAdminSetupKey() {
+        return readSetting("SUPER_ADMIN_SETUP_KEY", "super.admin.setup.key", null);
+    }
+
     private static String readSetting(String environmentName,
                                       String propertyName,
                                       String defaultValue) {

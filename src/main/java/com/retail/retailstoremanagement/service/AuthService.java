@@ -35,6 +35,8 @@ public class AuthService {
             throws SQLException {
         if (storeCode == null || !storeCode.trim().matches("[A-Za-z0-9_-]{3,30}"))
             throw new ValidationException("Mã cửa hàng cần 3–30 ký tự, không có khoảng trắng.");
+        if ("SYSTEM".equalsIgnoreCase(storeCode.trim()))
+            throw new ValidationException("Mã cửa hàng SYSTEM được dành riêng cho hệ thống.");
         if (storeName == null || storeName.trim().length() < 2)
             throw new ValidationException("Vui lòng nhập tên cửa hàng.");
         validate(username, password, fullName);
@@ -60,6 +62,8 @@ public class AuthService {
         UserRole userRole;
         try { userRole = UserRole.valueOf(role); }
         catch (Exception e) { throw new ValidationException("Vai trò không hợp lệ."); }
+        if (userRole == UserRole.SUPER_ADMIN)
+            throw new ValidationException("ADMIN cửa hàng không thể tạo Super Admin.");
         return dao.create(username.trim(), BCrypt.hashpw(password, BCrypt.gensalt(12)), fullName.trim(), userRole);
     }
 
@@ -69,6 +73,8 @@ public class AuthService {
         UserRole userRole;
         try { userRole = UserRole.valueOf(role); }
         catch (Exception e) { throw new ValidationException("Vai trò không hợp lệ."); }
+        if (userRole == UserRole.SUPER_ADMIN)
+            throw new ValidationException("ADMIN cửa hàng không thể cấp quyền Super Admin.");
         if (currentUser != null && currentUser.getId() == id
                 && currentUser.getRole() == UserRole.ADMIN && userRole != UserRole.ADMIN) {
             throw new ValidationException("Không thể tự hạ quyền tài khoản đang đăng nhập.");

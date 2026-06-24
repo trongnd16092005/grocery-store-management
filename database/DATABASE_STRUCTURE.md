@@ -48,10 +48,13 @@ Stores application accounts.
 | `username` | VARCHAR(50) | Unique login name |
 | `password_hash` | VARCHAR(255) | BCrypt password hash, never plain text |
 | `full_name` | VARCHAR(120) | Employee name |
-| `role` | VARCHAR(20) | `ADMIN` or `CASHIER` |
+| `role` | VARCHAR(20) | `SUPER_ADMIN`, `ADMIN` or `CASHIER` |
 | `active` | BOOLEAN | Account status |
 | `auth_version` | INTEGER | Invalidates existing sessions after security-sensitive changes |
 | `store_id` | BIGINT | Tenant owner, FK to `stores` |
+
+The reserved store code `SYSTEM` owns Super Admin accounts. It contains no
+tenant business data; Super Admin screens query store metadata only.
 
 ### `categories`
 

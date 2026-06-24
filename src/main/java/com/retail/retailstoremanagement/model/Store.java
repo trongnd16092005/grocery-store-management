@@ -6,6 +6,8 @@ public class Store extends AuditableEntity {
     private String phone;
     private String address;
     private boolean active = true;
+    private long adminCount;
+    private long employeeCount;
 
     public String getCode() { return code; }
     public void setCode(String code) { this.code = code; }
@@ -17,4 +19,8 @@ public class Store extends AuditableEntity {
     public void setAddress(String address) { this.address = address; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public long getAdminCount() { return adminCount; }
+    public void setAdminCount(long adminCount) { this.adminCount = adminCount; }
+    public long getEmployeeCount() { return employeeCount; }
+    public void setEmployeeCount(long employeeCount) { this.employeeCount = employeeCount; }
 }

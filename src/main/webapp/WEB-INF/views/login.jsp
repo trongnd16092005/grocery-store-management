@@ -40,6 +40,7 @@
             <button class="btn btn-primary btn-lg w-100">Đăng nhập</button>
         </form>
         <div class="text-center mt-3"><a href="${pageContext.request.contextPath}/register">Đăng ký cửa hàng mới</a></div>
+        <div class="text-center mt-2 small"><a class="text-muted" href="${pageContext.request.contextPath}/super-admin/setup">Khởi tạo Super Admin lần đầu</a></div>
     </div>
 </div>
 </body>

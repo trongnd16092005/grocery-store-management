@@ -44,6 +44,7 @@ Kết nối Query Tool vào chính database `grocery_store`, sau đó chạy mig
 7. `database/migrations/V7__enforce_tenant_foreign_keys.sql`
 8. `database/migrations/V8__purchase_orders_discount_approval.sql`
 9. `database/migrations/V9__discount_codes.sql`
+10. `database/migrations/V10__super_admin.sql`
 
 Không chạy migration trên database mặc định `postgres`.
 
@@ -86,6 +87,7 @@ Project cũng hỗ trợ các biến môi trường tương đương:
 DB_URL=jdbc:postgresql://localhost:5432/grocery_store
 DB_USER=grocery_app
 DB_PASSWORD=<YOUR_DB_PASSWORD>
+SUPER_ADMIN_SETUP_KEY=<RANDOM_SECRET_AT_LEAST_12_CHARACTERS>
 ```
 
 ## 4. Thêm artifact để deploy
@@ -136,6 +138,8 @@ Thư mục `target/` là kết quả build và không được đưa lên Git.
 
 ## Phân quyền
 
+- `SUPER_ADMIN`: quản lý danh sách cửa hàng, khóa/mở khóa cửa hàng và tự đổi mật khẩu;
+  không truy cập dữ liệu bán hàng, kho hoặc khách hàng của từng tenant.
 - `ADMIN`: dashboard, sản phẩm, danh mục, kho, tài khoản, khách hàng, bán hàng, xem và hủy hóa đơn.
 - `CASHIER`: dashboard, khách hàng, bán hàng, xem hóa đơn và tự đổi mật khẩu; không được quản lý kho hoặc hủy hóa đơn.
 
@@ -143,6 +147,12 @@ Khi tài khoản bị khóa, đổi vai trò hoặc đổi/reset mật khẩu, m
 
 ## Mô hình nhiều cửa hàng
 
+- Sau khi chạy migration V10, cấu hình `SUPER_ADMIN_SETUP_KEY` rồi mở
+  `/super-admin/setup` để tạo Super Admin đầu tiên.
+- Super Admin đăng nhập với mã cửa hàng cố định `SYSTEM`.
+- Trang `/super-admin` cho phép xem số ADMIN/nhân viên và khóa hoặc mở khóa cửa hàng.
+- Khi cửa hàng bị khóa, đăng nhập mới bị từ chối và các session hiện có hết hiệu lực
+  ở request tiếp theo.
 - Truy cập `/register` để tạo cửa hàng và ADMIN đầu tiên.
 - Khi đăng nhập cần nhập `mã cửa hàng`, tên đăng nhập và mật khẩu.
 - Mỗi cửa hàng có thể tạo nhiều ADMIN và CASHIER trong mục Tài khoản.

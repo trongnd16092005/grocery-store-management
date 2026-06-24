@@ -62,8 +62,8 @@
                   <td class="ps-4 fw-semibold"><c:out value="${u.fullName}"/></td>
                   <td>${u.username}</td>
                   <td>
-                    <span class="badge ${u.role=='ADMIN'?'bg-primary':'bg-info text-dark'}">
-                      ${u.role=='ADMIN'?'Quản trị viên':'Thu ngân'}
+                    <span class="badge ${u.role=='SUPER_ADMIN'?'bg-dark':u.role=='ADMIN'?'bg-primary':'bg-info text-dark'}">
+                      ${u.role=='SUPER_ADMIN'?'Super Admin':u.role=='ADMIN'?'Quản trị viên':'Thu ngân'}
                     </span>
                   </td>
                   <td>

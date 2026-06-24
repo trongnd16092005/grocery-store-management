@@ -21,6 +21,14 @@ public class SidebarServlet extends HttpServlet {
         StringBuilder html = new StringBuilder(
                 "<div class=\"sidebar\"><div class=\"logo\"><i class=\"fa-solid fa-store me-2\"></i>")
                 .append(storeName).append("</div><ul class=\"sidebar-nav\">");
+        if (user != null && user.getRole() == UserRole.SUPER_ADMIN) {
+            link(html, context + "/super-admin", "fa-building-shield", "Quản lý cửa hàng");
+            link(html, context + "/users", "fa-key", "Đổi mật khẩu");
+            html.append("<li class=\"mt-auto\"><a href=\"").append(context)
+                    .append("/logout\" class=\"text-danger-hover\"><i class=\"fa-solid fa-right-from-bracket me-2\"></i>Đăng xuất</a></li></ul></div>");
+            response.getWriter().print(html);
+            return;
+        }
         link(html, context + "/dashboard", "fa-chart-pie", "Dashboard");
         if (user != null && user.getRole() == UserRole.ADMIN) {
             link(html, context + "/store", "fa-store", "Thông tin cửa hàng");

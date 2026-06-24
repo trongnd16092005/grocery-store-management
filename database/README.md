@@ -15,7 +15,8 @@ Database: `grocery_store`
 9. Open and execute `migrations/V7__enforce_tenant_foreign_keys.sql`.
 10. Open and execute `migrations/V8__purchase_orders_discount_approval.sql`.
 11. Open and execute `migrations/V9__discount_codes.sql`.
-12. Verify with:
+12. Open and execute `migrations/V10__super_admin.sql`.
+13. Verify with:
 
 ```sql
 SELECT current_database(), current_user;
