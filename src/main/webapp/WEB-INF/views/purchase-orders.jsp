@@ -13,7 +13,7 @@
 </head>
 <body>
 <div class="container-fluid p-0 d-flex">
-    <div id="sidebar-placeholder"></div>
+    <%@ include file="common/sidebar.jspf" %>
     <main class="main-content">
         <div class="topbar d-flex justify-content-between align-items-center">
             <div>
@@ -148,10 +148,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-fetch('${pageContext.request.contextPath}/common/sidebar').then(r=>r.text()).then(html=>{
-    document.getElementById('sidebar-placeholder').outerHTML=html;
-    document.querySelector('.sidebar-nav a[href$="/purchase-orders"]')?.classList.add('active');
-});
+
 const rows=document.getElementById('detailRows');
 document.getElementById('addRow').addEventListener('click',()=>{
     const clone=rows.querySelector('.detail-row').cloneNode(true);
