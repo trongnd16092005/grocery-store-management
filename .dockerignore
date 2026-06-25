@@ -1,0 +1,12 @@
+.git
+.idea
+.agents
+.codex
+target
+backup
+*.log
+.env
+.env.*
+!.env.example
+deployment.env
+node_modules

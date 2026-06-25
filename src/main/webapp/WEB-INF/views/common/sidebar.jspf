@@ -1,0 +1,74 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ page import="com.retail.retailstoremanagement.model.AppUser" %>
+<%@ page import="com.retail.retailstoremanagement.model.UserRole" %>
+<%@ page import="jakarta.servlet.http.HttpServletRequest" %>
+<%@ page import="jakarta.servlet.jsp.JspWriter" %>
+<%!
+    private String sidebarEscape(String value) {
+        if (value == null || value.isBlank()) return "Cửa hàng";
+        return value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+
+    private String activeClass(HttpServletRequest request, String path) {
+        Object forwardedPath = request.getAttribute("jakarta.servlet.forward.servlet_path");
+        String servletPath = forwardedPath == null
+                ? request.getServletPath() : forwardedPath.toString();
+        return path.equals(servletPath) ? " class=\"active\"" : "";
+    }
+
+    private void sidebarLink(JspWriter out, HttpServletRequest request,
+                             String context, String path, String icon,
+                             String text) throws java.io.IOException {
+        out.print("<li><a href=\"");
+        out.print(context);
+        out.print(path);
+        out.print("\"");
+        out.print(activeClass(request, path));
+        out.print("><i class=\"fa-solid ");
+        out.print(icon);
+        out.print(" me-2\"></i>");
+        out.print(text);
+        out.print("</a></li>");
+    }
+%>
+<%
+    AppUser sidebarUser = (AppUser) session.getAttribute("currentUser");
+    String sidebarContext = request.getContextPath();
+    String sidebarStoreName = sidebarEscape(sidebarUser == null ? "Cửa hàng" : sidebarUser.getStoreName());
+%>
+<div class="sidebar">
+    <div class="logo"><i class="fa-solid fa-store me-2"></i><%= sidebarStoreName %></div>
+    <ul class="sidebar-nav">
+        <%
+            if (sidebarUser != null && sidebarUser.getRole() == UserRole.SUPER_ADMIN) {
+                sidebarLink(out, request, sidebarContext, "/super-admin", "fa-building-shield", "Quản lý cửa hàng");
+                sidebarLink(out, request, sidebarContext, "/users", "fa-key", "Đổi mật khẩu");
+            } else {
+                sidebarLink(out, request, sidebarContext, "/dashboard", "fa-chart-pie", "Dashboard");
+                if (sidebarUser != null && sidebarUser.getRole() == UserRole.ADMIN) {
+                    sidebarLink(out, request, sidebarContext, "/store", "fa-store", "Thông tin cửa hàng");
+                    sidebarLink(out, request, sidebarContext, "/products", "fa-box-open", "Sản phẩm");
+                    sidebarLink(out, request, sidebarContext, "/categories", "fa-tags", "Danh mục");
+                    sidebarLink(out, request, sidebarContext, "/suppliers", "fa-truck-field", "Nhà cung cấp");
+                    sidebarLink(out, request, sidebarContext, "/inventory", "fa-warehouse", "Quản lý kho");
+                    sidebarLink(out, request, sidebarContext, "/purchase-orders", "fa-file-circle-plus", "Phiếu nhập hàng");
+                    sidebarLink(out, request, sidebarContext, "/discount-codes", "fa-ticket", "Mã giảm giá");
+                }
+                sidebarLink(out, request, sidebarContext, "/customers", "fa-users", "Khách hàng");
+                sidebarLink(out, request, sidebarContext, "/sale", "fa-cash-register", "Bán hàng");
+                sidebarLink(out, request, sidebarContext, "/invoices", "fa-file-invoice", "Hóa đơn");
+                sidebarLink(out, request, sidebarContext, "/users", "fa-user-shield",
+                        sidebarUser != null && sidebarUser.getRole() == UserRole.ADMIN
+                                ? "Tài khoản" : "Đổi mật khẩu");
+            }
+        %>
+        <li class="mt-auto">
+            <a href="<%= sidebarContext %>/logout" class="text-danger-hover">
+                <i class="fa-solid fa-right-from-bracket me-2"></i>Đăng xuất
+            </a>
+        </li>
+    </ul>
+</div>

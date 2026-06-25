@@ -12,7 +12,7 @@
 </head>
 <body>
 <div class="container-fluid p-0 d-flex">
-  <div id="sidebar-placeholder"></div>
+  <%@ include file="common/sidebar.jspf" %>
   <main class="main-content">
     <div class="topbar d-flex justify-content-between align-items-center">
       <h1 class="h4 m-0 fw-bold">${isAdmin ? '🔐 Tài khoản & phân quyền' : '🔑 Bảo mật tài khoản'}</h1>
@@ -273,12 +273,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   // Sidebar
-  fetch('${pageContext.request.contextPath}/common/sidebar')
-    .then(r => r.text())
-    .then(h => {
-      document.getElementById('sidebar-placeholder').outerHTML = h;
-      document.querySelector('.sidebar-nav a[href$="/users"]')?.classList.add('active');
-    });
+  
 
   // Mở modal sửa tài khoản
   function openEditModal(id, fullName, role) {

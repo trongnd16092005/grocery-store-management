@@ -244,7 +244,7 @@
 
 <div class="container-fluid p-0 d-flex" style="height:100vh; overflow:hidden;">
     <!-- SIDEBAR -->
-    <div id="sidebar-placeholder"></div>
+    <%@ include file="common/sidebar.jspf" %>
 
     <!-- MAIN CONTENT -->
     <div class="main-content" style="height:100vh; min-height:0; overflow:hidden;">
@@ -464,13 +464,7 @@
 <script src="<%= request.getContextPath() %>/assets/vendor/qrcode.min.js"></script>
 <script>
 // ---- Load Sidebar ----
-fetch('<%= request.getContextPath() %>/common/sidebar')
-    .then(r => r.text())
-    .then(html => {
-        document.getElementById('sidebar-placeholder').outerHTML = html;
-        const link = document.querySelector('.sidebar-nav a[href$="/sale"]');
-        if (link) link.classList.add('active');
-    });
+
 
 // ============================================================
 //  PRODUCT DATA (loaded from PostgreSQL through Java Web)

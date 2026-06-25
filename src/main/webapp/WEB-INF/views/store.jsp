@@ -12,7 +12,7 @@
 </head>
 <body>
 <div class="container-fluid p-0 d-flex">
-    <div id="sidebar-placeholder"></div>
+    <%@ include file="common/sidebar.jspf" %>
     <main class="main-content">
         <div class="topbar">
             <h1 class="h4 m-0 fw-bold"><i class="fa-solid fa-store me-2"></i>Thông Tin Cửa Hàng</h1>
@@ -154,10 +154,7 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-fetch('${pageContext.request.contextPath}/common/sidebar').then(r => r.text()).then(html => {
-    document.getElementById('sidebar-placeholder').outerHTML = html;
-    document.querySelector('.sidebar-nav a[href$="/store"]')?.classList.add('active');
-});
+
 </script>
 </body>
 </html>

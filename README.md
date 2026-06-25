@@ -47,6 +47,7 @@ Kết nối Query Tool vào chính database `grocery_store`, sau đó chạy mig
 10. `database/migrations/V10__super_admin.sql`
 11. `database/migrations/V11__single_super_admin.sql`
 12. `database/migrations/V12__payos_qr_payments.sql`
+13. `database/migrations/V13__store_payos_settings.sql`
 
 Không chạy migration trên database mặc định `postgres`.
 
@@ -141,6 +142,47 @@ target/RetailStoreManagement-1.0-SNAPSHOT.war
 
 Thư mục `target/` là kết quả build và không được đưa lên Git.
 
+## Chạy bằng Docker
+
+Docker là cách gọn nhất để chạy app trên máy khác hoặc deploy lên Render/Railway/VPS
+mà không phải cấu hình Tomcat thủ công.
+
+Build image:
+
+```bash
+docker build -t grocery-store-management .
+```
+
+Chạy container:
+
+```bash
+docker run --rm -p 8081:8080 ^
+  -e DB_URL="jdbc:postgresql://host:5432/grocery_store?sslmode=require" ^
+  -e DB_USER="grocery_app" ^
+  -e DB_PASSWORD="<DB_PASSWORD>" ^
+  -e APP_BASE_URL="http://localhost:8081/grocery-store" ^
+  -e PAYOS_CLIENT_ID="<PAYOS_CLIENT_ID>" ^
+  -e PAYOS_API_KEY="<PAYOS_API_KEY>" ^
+  -e PAYOS_CHECKSUM_KEY="<PAYOS_CHECKSUM_KEY>" ^
+  grocery-store-management
+```
+
+Mở:
+
+```text
+http://localhost:8081/grocery-store/login
+```
+
+Hoặc dùng Docker Compose:
+
+```bash
+copy deployment.env.example .env
+copy docker-compose.example.yml docker-compose.yml
+docker compose up --build
+```
+
+Không commit file `.env`, mật khẩu database hoặc key payOS thật.
+
 ## Phân quyền
 
 - `SUPER_ADMIN`: quản lý danh sách cửa hàng, khóa/mở khóa cửa hàng và tự đổi mật khẩu;
@@ -172,11 +214,7 @@ Thanh toán POS và hủy hóa đơn chạy trong transaction PostgreSQL, khóa 
 
 ## Thanh toán QR tự động với payOS
 
-TODO sau: thêm nút **Test kết nối payOS** trong tab Setup QR và hiển thị
-trạng thái webhook đã đăng ký/chưa đăng ký để chủ cửa hàng tự kiểm tra cấu
-hình trước khi bán thật.
-
-Sau khi chạy migration V12, cấu hình các biến môi trường:
+Sau khi chạy migration V12 và V13, cấu hình URL công khai cho app:
 
 ```text
 PAYOS_CLIENT_ID=<client-id>
@@ -185,7 +223,9 @@ PAYOS_CHECKSUM_KEY=<checksum-key>
 APP_BASE_URL=https://your-public-domain.example/grocery-store
 ```
 
-`APP_BASE_URL` phải là URL HTTPS công khai và đã bao gồm application context.
+`PAYOS_*` là cấu hình fallback toàn deployment. ADMIN từng cửa hàng có thể nhập
+bộ key riêng trong `Thông tin cửa hàng → Setup QR`; POS sẽ ưu tiên dùng key của
+cửa hàng đó. `APP_BASE_URL` phải là URL HTTPS công khai và đã bao gồm application context.
 Webhook cần đăng ký trên payOS:
 
 ```text
@@ -204,9 +244,8 @@ Luồng QR:
    `REVIEW`, không tự động ghi nhận bán hàng.
 
 Không đặt key payOS trong JSP, JavaScript, repository hoặc URL. Sau khi thay
-đổi key cần khởi động lại Tomcat. Cấu hình hiện tại dùng một kênh payOS chung
-cho toàn deployment; nếu mỗi cửa hàng cần tài khoản nhận tiền riêng thì phải
-bổ sung kho bí mật theo tenant.
+đổi key fallback cần khởi động lại Tomcat/container. Với key nhập trong tab
+Setup QR, chỉ cần lưu cấu hình cửa hàng.
 
 ## Xử lý lỗi thường gặp
 
