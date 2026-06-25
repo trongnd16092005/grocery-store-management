@@ -23,6 +23,8 @@ public class UserServlet extends HttpServlet {
                     ? service.findAll() : java.util.List.of(current));
             req.setAttribute("currentUserId", current != null ? current.getId() : -1L);
             req.setAttribute("isAdmin", current != null && current.getRole() == UserRole.ADMIN);
+            req.setAttribute("mustChangePassword",
+                    current != null && current.isMustChangePassword());
             req.setAttribute("flashSuccess", RequestUtils.consumeFlash(req, "flashSuccess"));
             req.setAttribute("flashError",   RequestUtils.consumeFlash(req, "flashError"));
             req.getRequestDispatcher("/WEB-INF/views/users.jsp").forward(req, resp);
@@ -83,8 +85,9 @@ public class UserServlet extends HttpServlet {
                         req.getParameter("currentPassword"),
                         req.getParameter("newPassword")
                     );
-                    RequestUtils.flash(req, "flashSuccess", "Đã đổi mật khẩu.");
-                    break;
+                    req.getSession().invalidate();
+                    resp.sendRedirect(req.getContextPath() + "/login?passwordChanged=1");
+                    return;
 
                 case "reset-password":
                     requireAdmin(current);

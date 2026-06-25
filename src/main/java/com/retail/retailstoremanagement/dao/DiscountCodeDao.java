@@ -16,4 +16,5 @@ public interface DiscountCodeDao {
     boolean update(DiscountCode code) throws SQLException;
     boolean setActive(long id, boolean active) throws SQLException;
     void incrementUsage(Connection connection, long id) throws SQLException;
+    Long findProductIdByCode(String productCode) throws SQLException;
 }

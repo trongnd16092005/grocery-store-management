@@ -33,6 +33,10 @@ public class InvoiceService {
         PaymentMethod method;
         try { method = PaymentMethod.valueOf(payment.toUpperCase()); }
         catch (Exception e) { throw new ValidationException("Phương thức thanh toán không hợp lệ."); }
+        if (method == PaymentMethod.QR) {
+            throw new ValidationException(
+                    "Thanh toán QR phải được xử lý qua luồng payOS.");
+        }
 
         if (cashier == null) throw new ValidationException("Không xác định được thu ngân.");
         return dao.checkout(items, emptyToNull(customerCode), method, cashReceived,

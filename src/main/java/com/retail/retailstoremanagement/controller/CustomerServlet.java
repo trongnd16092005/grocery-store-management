@@ -34,6 +34,8 @@ public class CustomerServlet extends HttpServlet {
             Long editId = RequestUtils.optionalLong(request, "editId");
             if (editId != null) {
                 request.setAttribute("editingCustomer", customerService.findById(editId));
+                request.setAttribute("purchaseHistory",
+                        customerService.purchaseHistory(editId, 30));
             }
             request.getRequestDispatcher("/WEB-INF/views/customers.jsp").forward(request, response);
         } catch (SQLException | NumberFormatException exception) {

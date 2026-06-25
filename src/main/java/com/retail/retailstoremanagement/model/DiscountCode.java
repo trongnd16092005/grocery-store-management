@@ -15,6 +15,10 @@ public class DiscountCode extends AuditableEntity {
     private Integer usageLimit;
     private int usedCount;
     private boolean active = true;
+    private String customerTypeScope = "ALL";
+    private Long productId;
+    private String productCode;
+    private String productName;
 
     public String getCode() { return code; }
     public void setCode(String code) { this.code = code; }
@@ -38,4 +42,12 @@ public class DiscountCode extends AuditableEntity {
     public void setUsedCount(int usedCount) { this.usedCount = usedCount; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public String getCustomerTypeScope() { return customerTypeScope; }
+    public void setCustomerTypeScope(String customerTypeScope) { this.customerTypeScope = customerTypeScope; }
+    public Long getProductId() { return productId; }
+    public void setProductId(Long productId) { this.productId = productId; }
+    public String getProductCode() { return productCode; }
+    public void setProductCode(String productCode) { this.productCode = productCode; }
+    public String getProductName() { return productName; }
+    public void setProductName(String productName) { this.productName = productName; }
 }

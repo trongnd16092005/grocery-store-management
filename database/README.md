@@ -16,7 +16,9 @@ Database: `grocery_store`
 10. Open and execute `migrations/V8__purchase_orders_discount_approval.sql`.
 11. Open and execute `migrations/V9__discount_codes.sql`.
 12. Open and execute `migrations/V10__super_admin.sql`.
-13. Verify with:
+13. Open and execute `migrations/V11__single_super_admin.sql`.
+14. Open and execute `migrations/V12__payos_qr_payments.sql`.
+15. Verify with:
 
 ```sql
 SELECT current_database(), current_user;
@@ -24,6 +26,7 @@ SELECT COUNT(*) FROM categories;
 SELECT COUNT(*) FROM products;
 SELECT COUNT(*) FROM customers;
 SELECT * FROM low_stock_products ORDER BY code;
+SELECT username, role, active FROM app_users WHERE role='SUPER_ADMIN';
 ```
 
 Expected demo counts: 4 categories, 8 products, 6 customers.

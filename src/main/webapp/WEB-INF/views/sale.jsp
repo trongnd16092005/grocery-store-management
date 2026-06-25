@@ -162,6 +162,15 @@
             font-size: 14px; font-weight: 700;
             min-width: 22px; text-align: center;
         }
+        .qty-ctrl .qty-input {
+            width: 48px;
+            height: 28px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 700;
+            padding: 2px 4px;
+        }
         .item-subtotal {
             font-size: 13px; font-weight: 700;
             color: #1e293b; min-width: 80px; text-align: right;
@@ -225,6 +234,10 @@
             padding: 12px;
             text-align: center;
         }
+        #qrCanvas { width:210px;height:210px;max-width:100%;margin:0 auto;overflow:hidden }
+        #qrCanvas canvas,#qrCanvas img,#qrCanvas svg { width:100%!important;height:100%!important;display:block }
+        .qr-waiting { animation: qrPulse 1.5s ease-in-out infinite; }
+        @keyframes qrPulse { 50% { opacity: .55; } }
     </style>
 </head>
 <body>
@@ -373,10 +386,28 @@
                     </div>
 
                     <div class="qr-placeholder mb-3 d-none" id="qrPaymentPanel">
-                        <i class="fa-solid fa-qrcode text-primary fs-1 mb-2"></i>
-                        <div class="fw-bold">Thanh toán QR</div>
-                        <div class="small text-muted">Khu vực tạo mã QR động sẽ được tích hợp ở giai đoạn backend.</div>
-                        <span class="badge text-bg-light border mt-2">Sẵn sàng phát triển sau</span>
+                        <div id="qrReadyState">
+                            <i class="fa-solid fa-qrcode text-primary fs-1 mb-2"></i>
+                            <div class="fw-bold">Thanh toán QR tự động</div>
+                            <div class="small text-muted">Nhấn Thanh toán để tạo mã QR payOS theo đúng số tiền.</div>
+                        </div>
+                        <div id="qrActiveState" class="d-none">
+                            <div id="qrCanvas" class="bg-white p-2 border rounded mb-2"></div>
+                            <div class="fw-bold text-danger fs-5" id="qrAmount">0 đ</div>
+                            <div class="small text-muted">Mã đơn: <strong id="qrOrderCode"></strong></div>
+                            <div class="small mt-1 qr-waiting" id="qrStatusText">
+                                <i class="fa-solid fa-spinner fa-spin me-1"></i>Đang chờ ngân hàng xác nhận...
+                            </div>
+                            <div class="small text-muted mt-1">Hết hạn sau <strong id="qrCountdown">10:00</strong></div>
+                            <div class="d-flex gap-2 justify-content-center mt-3">
+                                <a id="qrCheckoutUrl" class="btn btn-sm btn-outline-primary" target="_blank">
+                                    <i class="fa-solid fa-up-right-from-square me-1"></i>Mở trang thanh toán
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="cancelQrPayment()">
+                                    <i class="fa-solid fa-xmark me-1"></i>Hủy QR
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <button class="btn btn-success w-100 checkout-btn" onclick="checkout()">
@@ -385,6 +416,23 @@
                 </div>
             </div>
         </div><!-- /pos-wrapper -->
+    </div>
+</div>
+
+<!-- ===== APP ALERT MODAL ===== -->
+<div class="modal fade" id="appAlertModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="appAlertTitle">Thông báo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="appAlertMessage"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light border d-none" id="appAlertCancelBtn" data-bs-dismiss="modal">Không</button>
+                <button type="button" class="btn btn-primary" id="appAlertOkBtn" data-bs-dismiss="modal">Đã hiểu</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -413,6 +461,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="<%= request.getContextPath() %>/assets/vendor/qrcode.min.js"></script>
 <script>
 // ---- Load Sidebar ----
 fetch('<%= request.getContextPath() %>/common/sidebar')
@@ -484,6 +533,31 @@ let grandTotal = 0;      // tổng tiền sau giảm giá
 let paymentMethod = 'cash';
 let selectedCustomer = null;
 let csrfToken = null;
+let qrPayment = null;
+let qrPollTimer = null;
+let qrCountdownTimer = null;
+const STORE_NAME = '<%= ((com.retail.retailstoremanagement.model.AppUser) request.getSession().getAttribute("currentUser")).getStoreName().replace("\\", "\\\\").replace("'", "\\'") %>';
+
+function storeAlert(message, title = STORE_NAME + ' thông báo') {
+    document.getElementById('appAlertTitle').textContent = title;
+    document.getElementById('appAlertMessage').textContent = message;
+    document.getElementById('appAlertCancelBtn').classList.add('d-none');
+    const okBtn = document.getElementById('appAlertOkBtn');
+    okBtn.textContent = 'Đã hiểu';
+    okBtn.onclick = null;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('appAlertModal')).show();
+}
+
+function storeConfirm(message, onOk, title = STORE_NAME + ' xác nhận') {
+    document.getElementById('appAlertTitle').textContent = title;
+    document.getElementById('appAlertMessage').textContent = message;
+    const cancelBtn = document.getElementById('appAlertCancelBtn');
+    cancelBtn.classList.remove('d-none');
+    const okBtn = document.getElementById('appAlertOkBtn');
+    okBtn.textContent = 'Đồng ý';
+    okBtn.onclick = () => setTimeout(onOk, 0);
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('appAlertModal')).show();
+}
 
 async function ensureSecurityContext() {
     if (csrfToken) return;
@@ -498,6 +572,7 @@ function onCustomerCodeInput(el) {
     selectedCustomer = null;
     el.classList.remove('is-valid', 'is-invalid');
     document.getElementById('customerFeedback').classList.add('d-none');
+    if (document.getElementById('discountCodeInput').value.trim()) clearAppliedDiscount(false);
 }
 
 async function lookupCustomer() {
@@ -525,8 +600,9 @@ async function lookupCustomer() {
         }
         selectedCustomer = data;
         input.classList.add('is-valid');
-        feedback.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i>${data.name} · ${data.phone}`;
+        feedback.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i>${data.name} · ${customerTypeLabel(data.type)} · ${data.points || 0} điểm`;
         feedback.classList.add('text-success');
+        if (document.getElementById('discountCodeInput').value.trim()) clearAppliedDiscount(false);
         return true;
     } catch (error) {
         input.classList.add('is-invalid');
@@ -537,6 +613,10 @@ async function lookupCustomer() {
 }
 
 function setPaymentMethod(method) {
+    if (qrPayment && qrPayment.status === 'PENDING' && method !== 'qr') {
+        storeAlert('Hãy hủy giao dịch QR đang chờ trước khi đổi phương thức thanh toán.');
+        return;
+    }
     paymentMethod = method;
     document.getElementById('cashMethodBtn').classList.toggle('active', method === 'cash');
     document.getElementById('qrMethodBtn').classList.toggle('active', method === 'qr');
@@ -551,11 +631,12 @@ function openQrPayment() {
 }
 
 function addToCart(id) {
+    if (qrPayment && qrPayment.status === 'PENDING') return;
     const p = PRODUCTS.find(x => x.id === id);
     if (!p || p.stock <= 0) return;
     if (cart[id]) {
         if (cart[id].qty >= p.stock) {
-            alert(`Không đủ hàng! Kho chỉ còn ${p.stock} sản phẩm.`);
+            storeAlert(`Không đủ hàng! Kho chỉ còn ${p.stock} sản phẩm.`);
             return;
         }
         cart[id].qty++;
@@ -566,19 +647,43 @@ function addToCart(id) {
 }
 
 function changeQty(id, delta) {
+    if (qrPayment && qrPayment.status === 'PENDING') return;
     if (!cart[id]) return;
     const newQty = cart[id].qty + delta;
     if (newQty <= 0) { delete cart[id]; }
     else if (newQty > cart[id].stock) {
-        alert(`Không đủ hàng! Kho chỉ còn ${cart[id].stock} sản phẩm.`);
+        storeAlert(`Không đủ hàng! Kho chỉ còn ${cart[id].stock} sản phẩm.`);
         return;
     } else { cart[id].qty = newQty; }
     renderCart();
 }
 
-function removeItem(id) { delete cart[id]; renderCart(); }
+function removeItem(id) {
+    if (qrPayment && qrPayment.status === 'PENDING') return;
+    delete cart[id];
+    renderCart();
+}
 
-function clearCart() {
+function setQty(id, rawValue) {
+    if (qrPayment && qrPayment.status === 'PENDING') return;
+    if (!cart[id]) return;
+    const newQty = parseInt(String(rawValue).replace(/\D/g, ''), 10) || 0;
+    if (newQty <= 0) {
+        delete cart[id];
+    } else if (newQty > cart[id].stock) {
+        storeAlert(`Không đủ hàng! Kho chỉ còn ${cart[id].stock} sản phẩm.`);
+        cart[id].qty = cart[id].stock;
+    } else {
+        cart[id].qty = newQty;
+    }
+    renderCart();
+}
+
+function clearCart(force = false) {
+    if (!force && qrPayment && qrPayment.status === 'PENDING') {
+        storeAlert('Hãy hủy giao dịch QR đang chờ trước khi xóa giỏ hàng.');
+        return;
+    }
     cart = {};
     clearAppliedDiscount(true);
     renderCart();
@@ -611,7 +716,10 @@ function renderCart() {
             </div>
             <div class="qty-ctrl">
                 <button onclick="changeQty('${id}',-1)">−</button>
-                <span class="qty-val">${item.qty}</span>
+                <input class="qty-input" inputmode="numeric" value="${item.qty}"
+                       onfocus="this.select()"
+                       onkeydown="if(event.key==='Enter'){this.blur()}"
+                       onchange="setQty('${id}', this.value)">
                 <button onclick="changeQty('${id}',1)">+</button>
             </div>
             <div class="item-subtotal">${fmt(sub)}</div>
@@ -663,8 +771,14 @@ async function applyDiscountCode() {
         return;
     }
     try {
-        const url = '<%= request.getContextPath() %>/api/discount-codes/validate?code='
-            + encodeURIComponent(code) + '&subtotal=' + encodeURIComponent(cartTotal);
+        const params = new URLSearchParams({code, subtotal: cartTotal});
+        const customerCode = document.getElementById('customerCodeInput').value.trim();
+        if (customerCode) params.set('customerCode', customerCode);
+        Object.values(cart).forEach(item => {
+            params.append('productCode', item.id);
+            params.append('lineTotal', String(item.price * item.qty));
+        });
+        const url = '<%= request.getContextPath() %>/api/discount-codes/validate?' + params.toString();
         const response = await fetch(url);
         const result = await response.json();
         if (!response.ok || !result.valid) throw new Error(result.message || 'Mã không hợp lệ.');
@@ -715,9 +829,9 @@ function onCashInput(el) {
 // ============================================================
 async function checkout() {
     if (Object.keys(cart).length === 0) {
-        alert('Giỏ hàng đang trống! Vui lòng chọn sản phẩm trước khi thanh toán.'); return;
+        storeAlert('Giỏ hàng đang trống! Vui lòng chọn sản phẩm trước khi thanh toán.'); return;
     }
-    try { await ensureSecurityContext(); } catch (error) { alert(error.message); return; }
+    try { await ensureSecurityContext(); } catch (error) { storeAlert(error.message); return; }
     const customerCode = document.getElementById('customerCodeInput').value.trim();
     if (customerCode && !selectedCustomer) {
         const found = await lookupCustomer();
@@ -732,7 +846,7 @@ async function checkout() {
     cashEl.classList.remove('is-invalid');
     const enteredCode = document.getElementById('discountCodeInput').value.trim();
     if (enteredCode && enteredCode !== appliedDiscountCode) {
-        alert('Vui lòng nhấn Áp dụng để kiểm tra mã giảm giá.'); return;
+        storeAlert('Vui lòng nhấn Áp dụng để kiểm tra mã giảm giá.'); return;
     }
     await submitCheckout();
 }
@@ -753,16 +867,159 @@ async function submitCheckout() {
         const response = await fetch('<%= request.getContextPath() %>/api/checkout', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}, body});
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.message || 'Thanh toán thất bại.');
+        if (result.pending) {
+            await showQrPayment(result);
+            return;
+        }
         const discountLine = result.discount > 0 ? `<br>Giảm giá: <strong class="text-success">- ${fmt(result.discount)}</strong>` : '';
         document.getElementById('successMsg').innerHTML = `Hóa đơn <strong>${result.code}</strong> đã được lưu.${discountLine}<br>Tổng tiền: <strong class="text-danger">${fmt(result.total)}</strong>${result.change == null ? '' : `<br>Tiền thối: <strong class="text-success">${fmt(result.change)}</strong>`}`;
         document.getElementById('printInvoiceBtn').href =
             '<%= request.getContextPath() %>/invoices/print?id=' + result.invoiceId;
         bootstrap.Modal.getOrCreateInstance(document.getElementById('successModal')).show(); clearCart(); cashEl.value=''; await loadProducts();
     } catch (error) {
-        alert(error.message);
+        storeAlert(error.message);
     } finally {
         button.disabled = false;
     }
+}
+
+async function showQrPayment(result) {
+    qrPayment = {...result, status:'PENDING'};
+    document.getElementById('qrReadyState').classList.add('d-none');
+    document.getElementById('qrActiveState').classList.remove('d-none');
+    document.getElementById('qrAmount').textContent = fmt(result.total);
+    document.getElementById('qrOrderCode').textContent = result.orderCode;
+    document.getElementById('qrCheckoutUrl').href = result.checkoutUrl;
+    document.querySelector('.checkout-btn').classList.add('d-none');
+    const qrContainer = document.getElementById('qrCanvas');
+    qrContainer.innerHTML = '';
+    if (typeof QRCode === 'undefined') {
+        qrContainer.innerHTML =
+            '<div class="alert alert-warning small mb-0">Không thể vẽ QR trên màn hình. '
+            + '<a href="' + escapeHtml(result.checkoutUrl) + '" target="_blank">Mở trang thanh toán payOS</a>.</div>';
+    } else {
+        new QRCode(qrContainer, {
+            text: result.qrCode,
+            width: 194,
+            height: 194,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    }
+    startQrCountdown(result.expiresAt);
+    stopQrPolling();
+    qrPollTimer = setInterval(checkQrStatus, 2500);
+}
+
+function startQrCountdown(expiresAt) {
+    clearInterval(qrCountdownTimer);
+    const render = () => {
+        const remaining = Math.max(0, new Date(expiresAt).getTime() - Date.now());
+        const seconds = Math.floor(remaining / 1000);
+        document.getElementById('qrCountdown').textContent =
+            String(Math.floor(seconds / 60)).padStart(2,'0') + ':'
+            + String(seconds % 60).padStart(2,'0');
+        if (remaining <= 0) checkQrStatus();
+    };
+    render();
+    qrCountdownTimer = setInterval(render, 1000);
+}
+
+async function checkQrStatus() {
+    if (!qrPayment || qrPayment.status !== 'PENDING') return;
+    try {
+        const response = await fetch('<%= request.getContextPath() %>/api/payments/status?invoiceId='
+            + encodeURIComponent(qrPayment.invoiceId), {cache:'no-store'});
+        const result = await response.json();
+        if (!response.ok || !result.success) return;
+        qrPayment.status = result.status;
+        if (result.status === 'PAID') {
+            finishQrPayment(result);
+        } else if (['CANCELLED','EXPIRED','FAILED','REVIEW'].includes(result.status)) {
+            stopQrPolling();
+            document.getElementById('qrStatusText').classList.remove('qr-waiting');
+            document.getElementById('qrStatusText').innerHTML =
+                `<span class="text-danger"><i class="fa-solid fa-circle-xmark me-1"></i>${
+                    escapeHtml(result.message || qrStatusLabel(result.status))
+                }</span>`;
+            document.querySelector('.checkout-btn').classList.remove('d-none');
+            await loadProducts();
+        }
+    } catch (error) {
+        // Giữ polling; mất mạng tạm thời không được xem là thanh toán thất bại.
+    }
+}
+
+function finishQrPayment(result) {
+    stopQrPolling();
+    document.getElementById('qrStatusText').classList.remove('qr-waiting');
+    document.getElementById('qrStatusText').innerHTML =
+        '<span class="text-success"><i class="fa-solid fa-circle-check me-1"></i>Ngân hàng đã xác nhận thanh toán.</span>';
+    document.getElementById('successMsg').innerHTML =
+        `Hóa đơn <strong>${escapeHtml(result.code)}</strong> đã thanh toán qua QR.<br>`
+        + `Tổng tiền: <strong class="text-danger">${fmt(result.total)}</strong>`;
+    document.getElementById('printInvoiceBtn').href =
+        '<%= request.getContextPath() %>/invoices/print?id=' + result.invoiceId;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('successModal')).show();
+    clearCart(true);
+    resetQrPanel();
+    loadProducts();
+}
+
+async function cancelQrPayment() {
+    if (!qrPayment || qrPayment.status !== 'PENDING') {
+        resetQrPanel();
+        return;
+    }
+    storeConfirm('Hủy giao dịch QR này và hoàn lại hàng đang giữ?', async () => {
+    await ensureSecurityContext();
+    const body = new URLSearchParams({
+        invoiceId: qrPayment.invoiceId,
+        csrfToken
+    });
+    try {
+        const response = await fetch('<%= request.getContextPath() %>/api/payments/cancel', {
+            method:'POST',
+            headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+            body
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Không thể hủy QR.');
+        resetQrPanel();
+        await loadProducts();
+    } catch (error) {
+        storeAlert(error.message);
+    }
+    });
+}
+
+function resetQrPanel() {
+    stopQrPolling();
+    qrPayment = null;
+    document.getElementById('qrReadyState').classList.remove('d-none');
+    document.getElementById('qrActiveState').classList.add('d-none');
+    document.getElementById('qrCanvas').innerHTML = '';
+    document.getElementById('qrStatusText').classList.add('qr-waiting');
+    document.getElementById('qrStatusText').innerHTML =
+        '<i class="fa-solid fa-spinner fa-spin me-1"></i>Đang chờ ngân hàng xác nhận...';
+    document.querySelector('.checkout-btn').classList.remove('d-none');
+}
+
+function stopQrPolling() {
+    clearInterval(qrPollTimer);
+    clearInterval(qrCountdownTimer);
+    qrPollTimer = null;
+    qrCountdownTimer = null;
+}
+
+function qrStatusLabel(status) {
+    return {
+        CANCELLED:'Giao dịch đã hủy.',
+        EXPIRED:'Mã QR đã hết hạn.',
+        FAILED:'Không thể tạo hoặc xử lý giao dịch.',
+        REVIEW:'Giao dịch cần được quản trị viên kiểm tra.'
+    }[status] || 'Giao dịch không thành công.';
 }
 
 // ============================================================
@@ -783,6 +1040,9 @@ function filterProducts() {
 // ============================================================
 function fmt(n) { return new Intl.NumberFormat('vi-VN').format(n) + ' đ'; }
 function escapeHtml(value) { const el=document.createElement('div'); el.textContent=value??''; return el.innerHTML; }
+function customerTypeLabel(type) {
+    return {REGULAR:'Khách thường', LOYAL:'Thân thiết', VIP:'VIP'}[type] || 'Khách';
+}
 </script>
 </body>
 </html>

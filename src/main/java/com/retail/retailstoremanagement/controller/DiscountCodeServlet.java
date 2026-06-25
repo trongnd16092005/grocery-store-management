@@ -77,6 +77,8 @@ public class DiscountCodeServlet extends HttpServlet {
                 code.setUsageLimit(optionalInteger(request, "usageLimit"));
                 code.setStartsAt(optionalDateTime(request, "startsAt"));
                 code.setEndsAt(optionalDateTime(request, "endsAt"));
+                code.setCustomerTypeScope(RequestUtils.text(request, "customerTypeScope"));
+                code.setProductCode(RequestUtils.text(request, "productCode"));
                 service.save(code);
                 RequestUtils.flash(request, "flashSuccess", "Đã lưu mã giảm giá.");
             }

@@ -7,6 +7,7 @@ public class AppUser extends AuditableEntity {
     private UserRole role = UserRole.CASHIER;
     private boolean active = true;
     private int authVersion;
+    private boolean mustChangePassword;
     private Long storeId;
     private String storeCode;
     private String storeName;
@@ -57,6 +58,14 @@ public class AppUser extends AuditableEntity {
 
     public void setAuthVersion(int authVersion) {
         this.authVersion = authVersion;
+    }
+
+    public boolean isMustChangePassword() {
+        return mustChangePassword;
+    }
+
+    public void setMustChangePassword(boolean mustChangePassword) {
+        this.mustChangePassword = mustChangePassword;
     }
 
     public Long getStoreId() { return storeId; }

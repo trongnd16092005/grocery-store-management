@@ -4,6 +4,9 @@ import com.retail.retailstoremanagement.dao.CustomerDao;
 import com.retail.retailstoremanagement.model.Customer;
 import com.retail.retailstoremanagement.model.CustomerType;
 import com.retail.retailstoremanagement.model.Gender;
+import com.retail.retailstoremanagement.model.Invoice;
+import com.retail.retailstoremanagement.model.InvoiceStatus;
+import com.retail.retailstoremanagement.model.PaymentMethod;
 import com.retail.retailstoremanagement.util.DatabaseConnection;
 
 import java.math.BigDecimal;
@@ -83,6 +86,22 @@ public class JdbcCustomerDao implements CustomerDao {
     }
 
     @Override
+    public List<Invoice> purchaseHistory(long customerId, int limit) throws SQLException {
+        String sql = "SELECT * FROM invoices WHERE customer_id=? "
+                + "ORDER BY created_at DESC LIMIT ?";
+        List<Invoice> invoices = new ArrayList<>();
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, customerId);
+            statement.setInt(2, Math.max(1, limit));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) invoices.add(mapInvoice(resultSet));
+            }
+        }
+        return invoices;
+    }
+
+    @Override
     public Customer insert(Customer customer) throws SQLException {
         String sql = "INSERT INTO customers(code, full_name, phone, email, gender, address, customer_type, active) "
                 + "VALUES ('KH' || LPAD(nextval('customer_code_seq')::text, 3, '0'), ?, ?, ?, ?, ?, ?, TRUE) "
@@ -154,6 +173,7 @@ public class JdbcCustomerDao implements CustomerDao {
         customer.setAddress(resultSet.getString("address"));
         customer.setCustomerType(CustomerType.valueOf(resultSet.getString("customer_type")));
         customer.setActive(resultSet.getBoolean("active"));
+        customer.setLoyaltyPoints(resultSet.getInt("loyalty_points"));
         customer.setCreatedAt(resultSet.getObject("created_at", OffsetDateTime.class));
         customer.setUpdatedAt(resultSet.getObject("updated_at", OffsetDateTime.class));
         customer.setPurchaseCount(resultSet.getLong("purchase_count"));
@@ -161,6 +181,21 @@ public class JdbcCustomerDao implements CustomerDao {
         customer.setTotalSpent(totalSpent == null ? BigDecimal.ZERO : totalSpent);
         customer.setLastPurchaseAt(resultSet.getObject("last_purchase_at", OffsetDateTime.class));
         return customer;
+    }
+
+    private Invoice mapInvoice(ResultSet resultSet) throws SQLException {
+        Invoice invoice = new Invoice();
+        invoice.setId(resultSet.getLong("id"));
+        invoice.setCode(resultSet.getString("code"));
+        invoice.setPaymentMethod(PaymentMethod.valueOf(resultSet.getString("payment_method")));
+        invoice.setStatus(InvoiceStatus.valueOf(resultSet.getString("status")));
+        invoice.setSubtotal(resultSet.getBigDecimal("subtotal"));
+        invoice.setDiscountAmount(resultSet.getBigDecimal("discount_amount"));
+        invoice.setTotalAmount(resultSet.getBigDecimal("total_amount"));
+        invoice.setDiscountCode(resultSet.getString("discount_code"));
+        invoice.setCreatedAt(resultSet.getObject("created_at", OffsetDateTime.class));
+        invoice.setCancelledAt(resultSet.getObject("cancelled_at", OffsetDateTime.class));
+        return invoice;
     }
 
     private void setNullableString(PreparedStatement statement, int index, String value)

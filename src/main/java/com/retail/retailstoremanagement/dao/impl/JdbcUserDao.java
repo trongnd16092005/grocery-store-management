@@ -140,7 +140,8 @@ public class JdbcUserDao implements UserDao {
     public void updatePassword(long id, String passwordHash) throws SQLException {
         try (Connection c = DatabaseConnection.getConnection();
              PreparedStatement s = c.prepareStatement(
-                 "UPDATE app_users SET password_hash=?, auth_version=auth_version+1 WHERE id=?")) {
+                 "UPDATE app_users SET password_hash=?, must_change_password=FALSE, "
+                         + "auth_version=auth_version+1 WHERE id=?")) {
             s.setString(1, passwordHash); s.setLong(2, id);
             if (s.executeUpdate() == 0) throw new SQLException("Không tìm thấy tài khoản.");
         }
@@ -162,6 +163,7 @@ public class JdbcUserDao implements UserDao {
         u.setRole(UserRole.valueOf(r.getString("role")));
         u.setActive(r.getBoolean("active"));
         u.setAuthVersion(r.getInt("auth_version"));
+        u.setMustChangePassword(r.getBoolean("must_change_password"));
         u.setCreatedAt(r.getObject("created_at", OffsetDateTime.class));
         u.setUpdatedAt(r.getObject("updated_at", OffsetDateTime.class));
         return u;

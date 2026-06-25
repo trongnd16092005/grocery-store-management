@@ -20,7 +20,8 @@ import com.retail.retailstoremanagement.util.TenantContext;
 
 public class AuthFilter implements Filter {
     private static final Set<String> PUBLIC =
-            Set.of("/login", "/register", "/super-admin/setup");
+            Set.of("/login", "/register", "/api/payments/payos/webhook",
+                    "/payment/return", "/payment/cancel");
     private static final Set<String> ADMIN = Set.of(
             "/products", "/products.html", "/categories", "/categories.html",
             "/inventory", "/inventory.html", "/suppliers", "/store", "/purchase-orders",
@@ -84,6 +85,20 @@ public class AuthFilter implements Filter {
         }
 
         session.setAttribute("currentUser", currentUser);
+        if (currentUser.isMustChangePassword()
+                && !path.equals("/users")
+                && !path.equals("/logout")
+                && !path.equals("/common/sidebar")
+                && !path.equals("/api/session")) {
+            TenantContext.clear();
+            if (path.startsWith("/api/")) {
+                httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN,
+                        "Bạn phải đổi mật khẩu trước khi tiếp tục.");
+            } else {
+                httpResponse.sendRedirect(httpRequest.getContextPath() + "/users");
+            }
+            return;
+        }
         if (currentUser.getRole() == UserRole.SUPER_ADMIN) {
             boolean allowed = path.equals("/super-admin")
                     || path.equals("/users")

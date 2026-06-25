@@ -31,6 +31,11 @@
     </div>
 
     <div class="content">
+      <c:if test="${mustChangePassword}">
+        <div class="alert alert-warning">
+          Đây là lần đăng nhập đầu tiên. Bạn phải đổi mật khẩu mặc định trước khi tiếp tục.
+        </div>
+      </c:if>
       <c:if test="${not empty flashSuccess}">
         <div class="alert alert-success alert-dismissible fade show" role="alert">
           ${flashSuccess}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
