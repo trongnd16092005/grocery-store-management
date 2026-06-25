@@ -7,11 +7,12 @@
 - Đăng ký và vận hành nhiều cửa hàng độc lập trên cùng hệ thống.
 - Quản lý sản phẩm, danh mục, khách hàng và tồn kho.
 - Nhập hàng, điều chỉnh tồn, cảnh báo tồn tối thiểu và lịch sử kho.
-- Bán hàng POS, thanh toán tiền mặt hoặc giao diện QR dự phòng.
+- Bán hàng POS, thanh toán tiền mặt hoặc QR payOS tự động.
 - Lưu, tra cứu và hủy hóa đơn; hủy hóa đơn tự động hoàn kho.
 - Đăng nhập BCrypt và phân quyền `ADMIN`/`CASHIER`.
 - Quản lý tài khoản: tạo, sửa, khóa/mở khóa, đổi mật khẩu (chính mình) và đặt lại mật khẩu (ADMIN).
-- Dashboard lấy dữ liệu trực tiếp từ PostgreSQL.
+- Dashboard lấy dữ liệu trực tiếp từ PostgreSQL, có biểu đồ và cảnh báo sắp hết hàng.
+- Tích điểm khách hàng, dùng điểm giảm giá khi bán hàng.
 
 ## Yêu cầu
 
@@ -19,6 +20,74 @@
 - Apache Tomcat 10.1.x. Không dùng Tomcat 9 vì project sử dụng namespace `jakarta.*`.
 - PostgreSQL 17 hoặc phiên bản tương thích.
 - IntelliJ IDEA Ultimate để cấu hình Tomcat trực tiếp.
+
+## Quick setup cho người mới pull code
+
+Nếu chỉ cần chạy nhanh trên máy khác, làm theo thứ tự này:
+
+1. Cài **JDK 17+**, **Tomcat 10.1.x**, **PostgreSQL 17+** và **Maven**.
+2. Clone project:
+
+```bash
+git clone <repo-url>
+cd grocery-store-management
+```
+
+3. Tạo database PostgreSQL:
+
+```sql
+CREATE ROLE grocery_app WITH LOGIN PASSWORD '<YOUR_DB_PASSWORD>';
+CREATE DATABASE grocery_store
+    WITH OWNER grocery_app
+    ENCODING 'UTF8';
+```
+
+4. Chạy toàn bộ file trong `database/migrations/` theo thứ tự `V1` đến `V16`.
+5. Nếu muốn có dữ liệu demo đẹp cho dashboard/phiếu nhập, chạy thêm:
+
+```text
+database/demo/seed_dashboard_20260619_20260626.sql
+database/demo/seed_purchase_orders_20260618.sql
+```
+
+6. Build project:
+
+```bash
+mvn clean package
+```
+
+7. Chạy bằng Tomcat 10.1 với context:
+
+```text
+/grocery-store
+```
+
+và VM options tối thiểu:
+
+```text
+-Ddb.url=jdbc:postgresql://localhost:5432/grocery_store -Ddb.user=grocery_app -Ddb.password=<YOUR_DB_PASSWORD>
+```
+
+8. Mở:
+
+```text
+http://localhost:8080/grocery-store/login
+```
+
+Nếu port 8080 bận, đổi Tomcat sang 8081 và mở:
+
+```text
+http://localhost:8081/grocery-store/login
+```
+
+Tài khoản demo sau khi chạy migration/seed mặc định:
+
+| Mã cửa hàng | Tài khoản | Mật khẩu | Vai trò |
+|---|---|---|---|
+| `CUAHANGABC` | `admin` | `123456` | ADMIN cửa hàng |
+| `SYSTEM` | `admin` | `123456` | Super Admin |
+
+Nếu đăng nhập `SYSTEM/admin/123456`, hệ thống có thể yêu cầu đổi mật khẩu trước khi dùng.
 
 ## 1. Khởi tạo PostgreSQL
 
@@ -48,6 +117,9 @@ Kết nối Query Tool vào chính database `grocery_store`, sau đó chạy mig
 11. `database/migrations/V11__single_super_admin.sql`
 12. `database/migrations/V12__payos_qr_payments.sql`
 13. `database/migrations/V13__store_payos_settings.sql`
+14. `database/migrations/V14__customer_loyalty_discount_conditions.sql`
+15. `database/migrations/V15__fix_discount_product_fk_delete.sql`
+16. `database/migrations/V16__redeemable_loyalty_points.sql`
 
 Không chạy migration trên database mặc định `postgres`.
 
@@ -59,7 +131,18 @@ SELECT COUNT(*) FROM products;
 SELECT COUNT(*) FROM customers;
 ```
 
-Sau khi chạy đầy đủ V1–V5, dữ liệu mẫu có 4 danh mục, 20 sản phẩm và 6 khách hàng.
+Sau khi chạy đầy đủ V1–V16, database có đủ schema, dữ liệu nền, phân quyền,
+QR payOS, tích điểm khách hàng và các cột phục vụ dashboard hiện tại.
+
+Nếu muốn dữ liệu dashboard đẹp hơn để demo, chạy thêm hai file demo:
+
+```text
+database/demo/seed_dashboard_20260619_20260626.sql
+database/demo/seed_purchase_orders_20260618.sql
+```
+
+Các file demo này tạo dữ liệu liên thông giữa hóa đơn, khách hàng, tồn kho,
+phiếu nhập và lịch sử kho. Chỉ chạy trên database demo/phát triển, không chạy trên dữ liệu thật.
 
 ## 2. Thêm Tomcat vào IntelliJ
 
@@ -90,11 +173,17 @@ Project cũng hỗ trợ các biến môi trường tương đương:
 DB_URL=jdbc:postgresql://localhost:5432/grocery_store
 DB_USER=grocery_app
 DB_PASSWORD=<YOUR_DB_PASSWORD>
+DB_POOL_MAX_SIZE=6
+DB_POOL_MIN_IDLE=1
 PAYOS_CLIENT_ID=<PAYOS_CLIENT_ID>
 PAYOS_API_KEY=<PAYOS_API_KEY>
 PAYOS_CHECKSUM_KEY=<PAYOS_CHECKSUM_KEY>
+PAYOS_TEST_AMOUNT=5000
 APP_BASE_URL=https://your-public-domain.example/grocery-store
 ```
+
+Nếu chưa test QR payOS, vẫn có thể chạy app bằng tiền mặt. Khi bấm QR mà thiếu
+key/payOS hoặc chưa bật setup QR, hệ thống sẽ báo lỗi cấu hình.
 
 ## 4. Thêm artifact để deploy
 
@@ -183,6 +272,18 @@ docker compose up --build
 
 Không commit file `.env`, mật khẩu database hoặc key payOS thật.
 
+Ứng dụng sử dụng HikariCP để tái sử dụng kết nối PostgreSQL. Với database
+Render, cấu hình mặc định `DB_POOL_MAX_SIZE=6` và `DB_POOL_MIN_IDLE=1`
+phù hợp cho giai đoạn phát triển và cửa hàng nhỏ. Không nên tăng pool tùy ý
+vì mỗi gói PostgreSQL có giới hạn số kết nối.
+
+Trong giai đoạn test payOS, `PAYOS_TEST_AMOUNT=5000` khiến QR tự động tạo
+giao dịch 5.000đ để tránh phải thanh toán thử các hóa đơn lớn. Khi chạy thật,
+đặt `PAYOS_TEST_AMOUNT=0` để dùng đúng tổng tiền hóa đơn.
+
+Lưu ý: ở chế độ test, `payment_transactions.amount` là 5.000đ để payOS/webhook
+đối chiếu, còn `invoices.total_amount` vẫn lưu đúng tổng tiền hóa đơn thật.
+
 ## Phân quyền
 
 - `SUPER_ADMIN`: quản lý danh sách cửa hàng, khóa/mở khóa cửa hàng và tự đổi mật khẩu;
@@ -247,6 +348,23 @@ Không đặt key payOS trong JSP, JavaScript, repository hoặc URL. Sau khi th
 đổi key fallback cần khởi động lại Tomcat/container. Với key nhập trong tab
 Setup QR, chỉ cần lưu cấu hình cửa hàng.
 
+## Checklist sau khi setup
+
+Sau khi chạy app trên máy mới, kiểm tra nhanh các luồng sau:
+
+1. Đăng nhập `CUAHANGABC / admin / 123456`.
+2. Vào Dashboard, kiểm tra biểu đồ doanh thu và cảnh báo tồn kho.
+3. Vào Sản phẩm, Danh mục, Nhà cung cấp, Kho, Phiếu nhập để chắc trang load 200.
+4. Vào Bán hàng:
+   - sản phẩm hiện skeleton rồi load danh sách;
+   - thêm sản phẩm vào giỏ;
+   - thanh toán tiền mặt;
+   - nếu có key payOS, thử QR test 5.000đ.
+5. Vào Hóa đơn, mở chi tiết và in hóa đơn.
+6. Vào Khách hàng, kiểm tra điểm khả dụng/tích lũy.
+7. Vào Thông tin cửa hàng, kiểm tra setup QR nếu cần.
+8. Đăng xuất rồi thử `SYSTEM / admin / 123456` để kiểm tra Super Admin.
+
 ## Xử lý lỗi thường gặp
 
 ### Port 8080 đã được sử dụng
@@ -279,6 +397,31 @@ Migration chưa được chạy hoặc đã chạy nhầm trên database `postgr
 ### Lỗi CSRF hoặc “Phiên biểu mẫu không hợp lệ”
 
 Tải lại trang và đăng nhập lại nếu phiên đã hết hạn.
+
+### Đăng nhập đúng mật khẩu nhưng vẫn không vào được
+
+Kiểm tra:
+
+- đã nhập đúng **mã cửa hàng** chưa, ví dụ `CUAHANGABC`;
+- database đang kết nối đúng DB đã chạy migration chưa;
+- tài khoản/cửa hàng có bị khóa bởi Super Admin không;
+- nếu Tomcat vừa redeploy, hãy đăng nhập lại vì session cũ có thể mất.
+
+### Trang vẫn hiện giao diện cũ
+
+Thử `Ctrl + F5`. Nếu vẫn không đổi, restart/redeploy Tomcat vì JSP/CSS có thể
+đang được server hoặc trình duyệt cache.
+
+### QR chỉ hiện 5.000đ
+
+Đây là chế độ test payOS. Hóa đơn vẫn lưu đúng tổng tiền thật. Muốn QR tạo đúng
+tổng tiền hóa đơn, đặt:
+
+```text
+PAYOS_TEST_AMOUNT=0
+```
+
+rồi restart Tomcat/container nếu dùng biến môi trường hoặc VM option fallback.
 
 ## Lịch sử thay đổi
 
@@ -318,7 +461,9 @@ Tải lại trang và đăng nhập lại nếu phiên đã hết hạn.
 - **In hóa đơn**: trang `/invoices/print?id=...` cung cấp mẫu receipt 80 mm lấy
   trực tiếp dữ liệu hóa đơn đã lưu trong PostgreSQL.
 
-## Việc còn thiếu / chưa hoàn thiện
+## Việc còn có thể cải thiện
 
-- **Thanh toán QR**: chỉ có giao diện ở `sale.jsp`, `CheckoutServlet` chưa sinh mã QR động hay tích hợp cổng thanh toán nào.
-- **Test**: mới có vài "smoke test" dạng `main()` chạy tay (`src/test/java/.../*SmokeTest.java`), cần kết nối DB thật, chưa phải unit test tự động hay CI.
+- Tách bớt CSS inline khỏi một số JSP, đặc biệt màn POS.
+- Thêm unit/integration test tự động cho checkout, QR, điểm khách hàng và phiếu nhập.
+- Thêm trang health check DB/payOS để hỗ trợ deploy production.
+- Cho phép cấu hình tỷ lệ tích điểm/quy đổi điểm trực tiếp trong giao diện cửa hàng.

@@ -22,6 +22,9 @@ public class Invoice extends BaseEntity {
     private BigDecimal totalAmount = BigDecimal.ZERO;
     private BigDecimal cashReceived;
     private BigDecimal changeAmount;
+    private int pointsRedeemed;
+    private BigDecimal pointsDiscountAmount = BigDecimal.ZERO;
+    private int pointsEarned;
     private String note;
     private String discountReason;
     private OffsetDateTime createdAt;
@@ -129,6 +132,13 @@ public class Invoice extends BaseEntity {
     public void setChangeAmount(BigDecimal changeAmount) {
         this.changeAmount = changeAmount;
     }
+
+    public int getPointsRedeemed() { return pointsRedeemed; }
+    public void setPointsRedeemed(int pointsRedeemed) { this.pointsRedeemed = pointsRedeemed; }
+    public BigDecimal getPointsDiscountAmount() { return pointsDiscountAmount; }
+    public void setPointsDiscountAmount(BigDecimal value) { pointsDiscountAmount = value; }
+    public int getPointsEarned() { return pointsEarned; }
+    public void setPointsEarned(int pointsEarned) { this.pointsEarned = pointsEarned; }
 
     public String getNote() {
         return note;

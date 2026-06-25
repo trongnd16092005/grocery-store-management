@@ -10,7 +10,8 @@ import java.util.Map;
 
 public interface PaymentDao {
     PaymentTransaction createPending(Map<String, Integer> items, String customerCode,
-                                     String discountCode, Long cashierId,
+                                     String discountCode, int pointsToRedeem,
+                                     BigDecimal providerAmount, Long cashierId,
                                      OffsetDateTime expiresAt) throws SQLException;
     PaymentTransaction attachPayOs(long orderCode, String paymentLinkId,
                                    String checkoutUrl, String qrCode) throws SQLException;

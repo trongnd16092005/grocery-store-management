@@ -7,6 +7,7 @@ import com.retail.retailstoremanagement.model.InvoiceDetail;
 import com.retail.retailstoremanagement.model.PaymentStatus;
 import com.retail.retailstoremanagement.model.PaymentTransaction;
 import com.retail.retailstoremanagement.service.DiscountCodeService;
+import com.retail.retailstoremanagement.service.ValidationException;
 import com.retail.retailstoremanagement.util.DatabaseConnection;
 import com.retail.retailstoremanagement.util.TenantContext;
 
@@ -21,9 +22,16 @@ public class JdbcPaymentDao implements PaymentDao {
     private final JdbcDiscountCodeDao discountDao = new JdbcDiscountCodeDao();
     private final DiscountCodeService discountService = new DiscountCodeService(discountDao);
 
-    @Override
     public PaymentTransaction createPending(Map<String, Integer> items, String customerCode,
                                             String discountCode, Long cashierId,
+                                            OffsetDateTime expiresAt) throws SQLException {
+        return createPending(items, customerCode, discountCode, 0, null, cashierId, expiresAt);
+    }
+
+    @Override
+    public PaymentTransaction createPending(Map<String, Integer> items, String customerCode,
+                                            String discountCode, int pointsToRedeem,
+                                            BigDecimal providerAmount, Long cashierId,
                                             OffsetDateTime expiresAt) throws SQLException {
         Long storeId = TenantContext.getStoreId();
         if (storeId == null) throw new SQLException("Không xác định được cửa hàng.");
@@ -54,7 +62,12 @@ public class JdbcPaymentDao implements PaymentDao {
                         throw new SQLException(exception.getMessage(), exception);
                     }
                 }
+                PointUsage pointUsage = calculatePointUsage(
+                        customer, pointsToRedeem, subtotal.subtract(discountAmount));
+                discountAmount = discountAmount.add(pointUsage.discount);
                 BigDecimal total = subtotal.subtract(discountAmount);
+                int pointsEarned = customer == null
+                        ? 0 : total.divideToIntegralValue(BigDecimal.valueOf(10000)).intValue();
                 if (total.compareTo(BigDecimal.ZERO) <= 0) {
                     throw new SQLException(
                             "Đơn hàng 0 đồng không thể thanh toán qua payOS.");
@@ -67,16 +80,21 @@ public class JdbcPaymentDao implements PaymentDao {
                 }
 
                 long invoiceId = insertInvoice(connection, customer == null ? null : customer.id, cashierId,
-                        subtotal, discountAmount, total, appliedCode);
+                        subtotal, discountAmount, total, appliedCode,
+                        pointUsage.points, pointUsage.discount, pointsEarned);
                 for (InvoiceDetail detail : details) {
                     insertDetail(connection, invoiceId, detail);
                     holdStock(connection, detail, invoiceId, cashierId);
                 }
                 if (appliedCode != null) discountDao.incrementUsage(
                         connection, appliedCode.getId());
+                if (customer != null && pointUsage.points > 0) {
+                    reservePoints(connection, customer.id, pointUsage.points);
+                }
 
                 long orderCode = nextOrderCode(connection);
-                insertPayment(connection, invoiceId, orderCode, total, expiresAt);
+                BigDecimal paymentAmount = providerAmount == null ? total : providerAmount;
+                insertPayment(connection, invoiceId, orderCode, paymentAmount, expiresAt);
                 insertRoute(connection, orderCode, storeId);
                 connection.commit();
                 return findByOrderCode(orderCode);
@@ -113,7 +131,7 @@ public class JdbcPaymentDao implements PaymentDao {
     public PaymentTransaction findByInvoice(long invoiceId) throws SQLException {
         try (Connection connection = DatabaseConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT p.*,i.code invoice_code FROM payment_transactions p "
+                     "SELECT p.*,i.code invoice_code,i.total_amount invoice_total_amount FROM payment_transactions p "
                              + "JOIN invoices i ON i.id=p.invoice_id WHERE p.invoice_id=?")) {
             statement.setLong(1, invoiceId);
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -192,7 +210,8 @@ public class JdbcPaymentDao implements PaymentDao {
                     statement.executeUpdate();
                 }
                 Long customerId = invoiceCustomerId(connection, payment.getInvoiceId());
-                if (customerId != null) refreshCustomerLoyalty(connection, customerId);
+                if (customerId != null) awardPendingInvoicePoints(
+                        connection, payment.getInvoiceId(), customerId);
                 connection.commit();
                 return findByOrderCode(orderCode);
             } catch (Exception exception) {
@@ -223,6 +242,7 @@ public class JdbcPaymentDao implements PaymentDao {
                 }
                 releaseStock(connection, payment.getInvoiceId(), reason);
                 decrementDiscountUsage(connection, payment.getInvoiceId());
+                restoreReservedPoints(connection, payment.getInvoiceId());
                 try (PreparedStatement statement = connection.prepareStatement(
                         "UPDATE invoices SET status='CANCELLED',cancelled_at=CURRENT_TIMESTAMP "
                                 + "WHERE id=? AND status='PENDING'")) {
@@ -252,14 +272,17 @@ public class JdbcPaymentDao implements PaymentDao {
     private CustomerInfo findCustomer(Connection connection, String code) throws SQLException {
         if (code == null) return null;
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT id,customer_type FROM customers WHERE UPPER(code)=? AND active")) {
+                "SELECT id,customer_type,loyalty_points FROM customers "
+                        + "WHERE UPPER(code)=? AND active FOR UPDATE")) {
             statement.setString(1, code.toUpperCase());
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
                     throw new SQLException("Không tìm thấy khách hàng " + code + ".");
                 }
-                return new CustomerInfo(resultSet.getLong("id"),
-                        CustomerType.valueOf(resultSet.getString("customer_type")));
+                return new CustomerInfo(
+                        resultSet.getLong("id"),
+                        CustomerType.valueOf(resultSet.getString("customer_type")),
+                        resultSet.getInt("loyalty_points"));
             }
         }
     }
@@ -305,12 +328,15 @@ public class JdbcPaymentDao implements PaymentDao {
 
     private long insertInvoice(Connection connection, Long customerId, Long cashierId,
                                BigDecimal subtotal, BigDecimal discountAmount,
-                               BigDecimal total, DiscountCode discountCode)
+                               BigDecimal total, DiscountCode discountCode,
+                               int pointsRedeemed, BigDecimal pointsDiscount,
+                               int pointsEarned)
             throws SQLException {
         String sql = "INSERT INTO invoices(code,customer_id,cashier_id,payment_method,status,"
-                + "subtotal,discount_amount,total_amount,discount_code_id,discount_code) "
+                + "subtotal,discount_amount,total_amount,discount_code_id,discount_code,"
+                + "points_redeemed,points_discount_amount,points_earned) "
                 + "VALUES ('HD'||LPAD(nextval('invoice_code_seq')::text,3,'0'),"
-                + "?,?,'QR','PENDING',?,?,?,?,?) RETURNING id";
+                + "?,?,'QR','PENDING',?,?,?,?,?,?,?,?) RETURNING id";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             nullableLong(statement, 1, customerId);
             nullableLong(statement, 2, cashierId);
@@ -319,6 +345,9 @@ public class JdbcPaymentDao implements PaymentDao {
             statement.setBigDecimal(5, total);
             nullableLong(statement, 6, discountCode == null ? null : discountCode.getId());
             statement.setString(7, discountCode == null ? null : discountCode.getCode());
+            statement.setInt(8, pointsRedeemed);
+            statement.setBigDecimal(9, pointsDiscount);
+            statement.setInt(10, pointsEarned);
             try (ResultSet resultSet = statement.executeQuery()) {
                 resultSet.next();
                 return resultSet.getLong(1);
@@ -408,6 +437,64 @@ public class JdbcPaymentDao implements PaymentDao {
         }
     }
 
+    private PointUsage calculatePointUsage(CustomerInfo customer, int requested,
+                                           BigDecimal amountBeforePoints) {
+        if (requested <= 0) return new PointUsage(0, BigDecimal.ZERO);
+        if (customer == null) {
+            throw new ValidationException("Cần chọn khách hàng để sử dụng điểm.");
+        }
+        if (requested > customer.availablePoints) {
+            throw new ValidationException("Khách hàng không đủ điểm hiện có.");
+        }
+        int maximumByAmount = amountBeforePoints
+                .divideToIntegralValue(BigDecimal.valueOf(100)).intValue();
+        if (requested > maximumByAmount) {
+            throw new ValidationException("Số điểm vượt quá giá trị đơn hàng.");
+        }
+        return new PointUsage(requested, BigDecimal.valueOf(requested * 100L));
+    }
+
+    private void reservePoints(Connection connection, long customerId, int points)
+            throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "UPDATE customers SET loyalty_points=loyalty_points-? "
+                        + "WHERE id=? AND loyalty_points>=?")) {
+            statement.setInt(1, points);
+            statement.setLong(2, customerId);
+            statement.setInt(3, points);
+            if (statement.executeUpdate() != 1) {
+                throw new SQLException("Điểm khách hàng vừa thay đổi.");
+            }
+        }
+    }
+
+    private void restoreReservedPoints(Connection connection, long invoiceId)
+            throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "UPDATE customers SET loyalty_points=loyalty_points+i.points_redeemed "
+                        + "FROM invoices i WHERE i.customer_id=customers.id "
+                        + "AND i.id=? AND i.points_redeemed>0")) {
+            statement.setLong(1, invoiceId);
+            statement.executeUpdate();
+        }
+    }
+
+    private void awardPendingInvoicePoints(Connection connection, long invoiceId,
+                                           long customerId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "UPDATE customers SET loyalty_points=loyalty_points+i.points_earned,"
+                        + "lifetime_loyalty_points=lifetime_loyalty_points+i.points_earned,"
+                        + "customer_type=CASE "
+                        + "WHEN lifetime_loyalty_points+i.points_earned>=300 THEN 'VIP' "
+                        + "WHEN lifetime_loyalty_points+i.points_earned>=50 THEN 'LOYAL' "
+                        + "ELSE 'REGULAR' END "
+                        + "FROM invoices i WHERE customers.id=? AND i.id=?")) {
+            statement.setLong(1, customerId);
+            statement.setLong(2, invoiceId);
+            statement.executeUpdate();
+        }
+    }
+
     private Long invoiceCustomerId(Connection connection, long invoiceId) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "SELECT customer_id FROM invoices WHERE id=?")) {
@@ -417,21 +504,6 @@ public class JdbcPaymentDao implements PaymentDao {
                 long value = resultSet.getLong(1);
                 return resultSet.wasNull() ? null : value;
             }
-        }
-    }
-
-    private void refreshCustomerLoyalty(Connection connection, long customerId)
-            throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(
-                "WITH stats AS (SELECT COALESCE(SUM(total_amount),0) total_spent "
-                        + "FROM invoices WHERE customer_id=? AND status='PAID') "
-                        + "UPDATE customers SET loyalty_points=FLOOR(stats.total_spent/10000)::INTEGER,"
-                        + "customer_type=CASE WHEN stats.total_spent>=3000000 THEN 'VIP' "
-                        + "WHEN stats.total_spent>=500000 THEN 'LOYAL' ELSE 'REGULAR' END "
-                        + "FROM stats WHERE customers.id=?")) {
-            statement.setLong(1, customerId);
-            statement.setLong(2, customerId);
-            statement.executeUpdate();
         }
     }
 
@@ -490,7 +562,7 @@ public class JdbcPaymentDao implements PaymentDao {
     private PaymentTransaction lockPayment(Connection connection, long orderCode)
             throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT p.*,i.code invoice_code FROM payment_transactions p "
+                "SELECT p.*,i.code invoice_code,i.total_amount invoice_total_amount FROM payment_transactions p "
                         + "JOIN invoices i ON i.id=p.invoice_id "
                         + "WHERE p.order_code=? FOR UPDATE OF p")) {
             statement.setLong(1, orderCode);
@@ -504,7 +576,7 @@ public class JdbcPaymentDao implements PaymentDao {
     private PaymentTransaction findByOrderCode(long orderCode) throws SQLException {
         try (Connection connection = DatabaseConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT p.*,i.code invoice_code FROM payment_transactions p "
+                     "SELECT p.*,i.code invoice_code,i.total_amount invoice_total_amount FROM payment_transactions p "
                              + "JOIN invoices i ON i.id=p.invoice_id WHERE p.order_code=?")) {
             statement.setLong(1, orderCode);
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -519,6 +591,8 @@ public class JdbcPaymentDao implements PaymentDao {
         payment.setId(resultSet.getLong("id"));
         payment.setInvoiceId(resultSet.getLong("invoice_id"));
         try { payment.setInvoiceCode(resultSet.getString("invoice_code")); }
+        catch (SQLException ignored) { }
+        try { payment.setInvoiceTotalAmount(resultSet.getBigDecimal("invoice_total_amount")); }
         catch (SQLException ignored) { }
         payment.setOrderCode(resultSet.getLong("order_code"));
         payment.setPaymentLinkId(resultSet.getString("payment_link_id"));
@@ -544,9 +618,22 @@ public class JdbcPaymentDao implements PaymentDao {
     private static final class CustomerInfo {
         private final long id;
         private final CustomerType type;
-        private CustomerInfo(long id, CustomerType type) {
+        private final int availablePoints;
+
+        private CustomerInfo(long id, CustomerType type, int availablePoints) {
             this.id = id;
             this.type = type;
+            this.availablePoints = availablePoints;
+        }
+    }
+
+    private static final class PointUsage {
+        private final int points;
+        private final BigDecimal discount;
+
+        private PointUsage(int points, BigDecimal discount) {
+            this.points = points;
+            this.discount = discount;
         }
     }
 }

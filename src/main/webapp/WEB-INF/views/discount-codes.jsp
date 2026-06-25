@@ -9,13 +9,13 @@
     <title>Quản lý mã giảm giá</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/style.css">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/style.css?v=ui2">
 </head>
 <body>
 <div class="container-fluid p-0 d-flex">
     <%@ include file="common/sidebar.jspf" %>
     <main class="main-content">
-        <div class="topbar"><h1 class="h4 m-0 fw-bold">🎟️ Quản Lý Mã Giảm Giá</h1></div>
+        <div class="topbar"><h1 class="h4 m-0 fw-bold"><i class="fa-solid fa-ticket me-2 text-primary"></i>Quản lý mã giảm giá</h1></div>
         <div class="content">
             <c:if test="${not empty flashSuccess}"><div class="alert alert-success"><c:out value="${flashSuccess}"/></div></c:if>
             <c:if test="${not empty flashError}"><div class="alert alert-danger"><c:out value="${flashError}"/></div></c:if>

@@ -1,5 +1,56 @@
 package com.retail.retailstoremanagement.controller;
-import com.retail.retailstoremanagement.dao.impl.JdbcProductDao;import com.retail.retailstoremanagement.model.Product;import com.retail.retailstoremanagement.util.JsonUtils;import jakarta.servlet.annotation.WebServlet;import jakarta.servlet.http.*;import java.io.IOException;import java.util.List;
-@WebServlet("/api/products/sale") public class SaleProductServlet extends HttpServlet{
- protected void doGet(HttpServletRequest q,HttpServletResponse p)throws IOException{p.setContentType("application/json;charset=UTF-8");try{List<Product> products=new JdbcProductDao().findAll();StringBuilder json=new StringBuilder("[ ");boolean first=true;for(Product x:products){if(!x.isActive())continue;if(!first)json.append(',');first=false;json.append("{\"id\":\"").append(JsonUtils.escape(x.getCode())).append("\",\"name\":\"").append(JsonUtils.escape(x.getName())).append("\",\"cat\":\"").append(JsonUtils.escape(x.getCategoryName())).append("\",\"price\":").append(x.getSellingPrice()).append(",\"stock\":").append(x.getStockQuantity()).append("}");}json.append(']');p.getWriter().print(json);}catch(Exception e){p.setStatus(500);p.getWriter().print("{\"message\":\""+JsonUtils.escape(e.getMessage())+"\"}");}}
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.retail.retailstoremanagement.dao.impl.JdbcProductDao;
+import com.retail.retailstoremanagement.model.Product;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@WebServlet("/api/products/sale")
+public class SaleProductServlet extends HttpServlet {
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    private final JdbcProductDao productDao = new JdbcProductDao();
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws IOException {
+        response.setContentType("application/json;charset=UTF-8");
+        try {
+            List<Map<String, Object>> products = productDao.findAll().stream()
+                    .filter(Product::isActive)
+                    .map(this::toSaleProduct)
+                    .collect(Collectors.toList());
+            JSON.writeValue(response.getWriter(), products);
+        } catch (Exception exception) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            JSON.writeValue(
+                    response.getWriter(),
+                    Map.of(
+                            "message",
+                            exception.getMessage() == null
+                                    ? "Không thể tải sản phẩm."
+                                    : exception.getMessage()
+                    )
+            );
+        }
+    }
+
+    private Map<String, Object> toSaleProduct(Product product) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", product.getCode());
+        result.put("name", product.getName());
+        result.put("cat", product.getCategoryName());
+        result.put("price", product.getSellingPrice());
+        result.put("stock", product.getStockQuantity());
+        return result;
+    }
 }

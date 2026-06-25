@@ -26,6 +26,12 @@ public class InvoiceService {
     public Invoice checkout(Map<String,Integer> items, String customerCode, String payment,
                             BigDecimal cashReceived, String discountCode, AppUser cashier)
             throws SQLException {
+        return checkout(items, customerCode, payment, cashReceived, discountCode, 0, cashier);
+    }
+
+    public Invoice checkout(Map<String,Integer> items, String customerCode, String payment,
+                            BigDecimal cashReceived, String discountCode, int pointsToRedeem,
+                            AppUser cashier) throws SQLException {
         if (items == null || items.isEmpty()) throw new ValidationException("Giỏ hàng đang trống.");
         for (Integer quantity : items.values()) {
             if (quantity == null || quantity <= 0) throw new ValidationException("Số lượng sản phẩm không hợp lệ.");
@@ -40,7 +46,7 @@ public class InvoiceService {
 
         if (cashier == null) throw new ValidationException("Không xác định được thu ngân.");
         return dao.checkout(items, emptyToNull(customerCode), method, cashReceived,
-                emptyToNull(discountCode), cashier.getId());
+                emptyToNull(discountCode), Math.max(0, pointsToRedeem), cashier.getId());
     }
 
     public List<Invoice> findAll(String keyword, String status, int pageSize, int page) throws SQLException {

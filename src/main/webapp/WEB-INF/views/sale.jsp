@@ -7,7 +7,7 @@
     <title>Bán Hàng (POS) - Cửa Hàng Bán Lẻ</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="<%= request.getContextPath() %>/assets/css/style.css">
+    <link rel="stylesheet" href="<%= request.getContextPath() %>/assets/css/style.css?v=ui2">
     <style>
         /* POS-specific styles */
         body { overflow: hidden; }
@@ -27,41 +27,47 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            border-right: 1px solid #e2e8f0;
-            background: #f8fafc;
+            border-right: 1px solid rgba(226, 232, 240, .82);
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, .08), transparent 38%),
+                #f6f9fc;
         }
 
         .product-panel-filter {
-            padding: 12px 16px;
-            background: #fff;
-            border-bottom: 1px solid #e2e8f0;
+            padding: 14px 18px;
+            background: rgba(255, 255, 255, .88);
+            border-bottom: 1px solid #e6edf5;
+            backdrop-filter: blur(12px);
             flex-shrink: 0;
         }
 
         .product-grid {
             flex: 1;
             overflow-y: auto;
-            padding: 16px;
+            padding: 18px;
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+            grid-auto-rows: 132px;
             gap: 14px;
             align-content: start;
         }
 
         .product-card {
-            background: #fff;
-            border: 1.5px solid #e2e8f0;
-            border-radius: 12px;
+            background: rgba(255, 255, 255, .96);
+            border: 1px solid #e1e9f2;
+            border-radius: 16px;
             cursor: pointer;
             transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            box-shadow: 0 8px 22px rgba(15, 23, 42, .04);
+            min-height: 132px;
         }
         .product-card:hover {
             transform: translateY(-3px);
-            box-shadow: 0 6px 20px rgba(59,130,246,0.14);
-            border-color: #3b82f6;
+            box-shadow: 0 14px 30px rgba(37, 99, 235, .12);
+            border-color: #9bbcff;
         }
         .product-card.out-of-stock {
             opacity: 0.55;
@@ -73,14 +79,21 @@
             border-color: #e2e8f0;
         }
         .product-card .icon-area {
-            height: 88px;
+            height: 42px;
+            min-height: 42px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2.2rem;
+            font-size: 1.45rem;
+            background: linear-gradient(135deg, #eff6ff, #f8fafc) !important;
+            color: #2563eb !important;
         }
         .product-card .card-info {
-            padding: 10px 10px 12px;
+            flex: 1;
+            min-height: 0;
+            padding: 9px 10px 10px;
+            display: flex;
+            flex-direction: column;
         }
         .product-card .card-info .cat-label {
             font-size: 10px;
@@ -99,27 +112,90 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+        .product-card .card-info > .d-flex {
+            margin-top: auto;
+            gap: 8px;
+        }
         .product-card .card-info .prod-price {
             font-size: 14px;
             font-weight: 700;
             color: #ef4444;
+            white-space: nowrap;
+        }
+        .product-card .badge {
+            flex: 0 0 auto;
+            padding: .28rem .5rem;
+            font-size: 10px !important;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+        .product-skeleton {
+            min-height: 132px;
+            padding: 12px;
+            border: 1px solid #e6edf5;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, .88);
+            box-shadow: 0 8px 22px rgba(15, 23, 42, .04);
+        }
+        .skeleton-line,
+        .skeleton-icon {
+            position: relative;
+            overflow: hidden;
+            background: #e8eef6;
+            border-radius: 999px;
+        }
+        .skeleton-icon {
+            width: 34px;
+            height: 34px;
+            margin: 0 auto 14px;
+            border-radius: 11px;
+        }
+        .skeleton-line {
+            height: 10px;
+            margin-bottom: 10px;
+        }
+        .skeleton-line.short { width: 46%; }
+        .skeleton-line.medium { width: 74%; }
+        .skeleton-line.full { width: 100%; }
+        .skeleton-line.price {
+            width: 52%;
+            height: 13px;
+            margin-top: 16px;
+            margin-bottom: 0;
+        }
+        .skeleton-line::after,
+        .skeleton-icon::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            transform: translateX(-100%);
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent);
+            animation: skeletonShimmer 1.15s infinite;
+        }
+        @keyframes skeletonShimmer {
+            100% { transform: translateX(100%); }
+        }
+        .product-load-error {
+            grid-column: 1 / -1;
+            align-self: start;
         }
 
         /* Cart Panel */
         .cart-panel {
-            width: 360px;
+            width: 376px;
             min-height: 0;
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
-            background: #fff;
+            background: #ffffff;
             overflow-y: auto;
             overscroll-behavior: contain;
             scrollbar-gutter: stable;
+            box-shadow: -12px 0 34px rgba(15, 23, 42, .06);
         }
         .cart-header {
-            padding: 14px 18px;
-            border-bottom: 1px solid #e2e8f0;
+            padding: 16px 20px;
+            border-bottom: 1px solid #edf2f7;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -134,9 +210,9 @@
         .cart-item {
             display: flex;
             align-items: center;
-            padding: 10px 16px;
+            padding: 12px 18px;
             gap: 10px;
-            border-bottom: 1px solid #f1f5f9;
+            border-bottom: 1px solid #edf2f7;
         }
         .cart-item:last-child { border-bottom: none; }
         .cart-item .item-info { flex: 1; min-width: 0; }
@@ -190,9 +266,9 @@
 
         .cart-summary {
             flex-shrink: 0;
-            border-top: 2px solid #e2e8f0;
-            padding: 14px 18px;
-            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            padding: 16px 20px 18px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         }
         .cart-panel::-webkit-scrollbar,
         .cart-items::-webkit-scrollbar,
@@ -205,8 +281,8 @@
         }
         .checkout-btn {
             font-size: 1.1rem; font-weight: 700;
-            padding: 13px; border-radius: 10px;
-            letter-spacing: 0.5px;
+            padding: 13px; border-radius: 13px;
+            letter-spacing: 0.2px;
         }
         .payment-method {
             display: grid;
@@ -214,23 +290,23 @@
             gap: 8px;
         }
         .payment-option {
-            border: 1.5px solid #cbd5e1;
+            border: 1px solid #d8e2ee;
             background: #fff;
             color: #475569;
-            border-radius: 9px;
+            border-radius: 12px;
             padding: 9px 8px;
             font-size: 13px;
             font-weight: 600;
         }
         .payment-option.active {
-            border-color: #3b82f6;
-            background: #eff6ff;
+            border-color: #93b4ff;
+            background: linear-gradient(180deg, #eff6ff, #ffffff);
             color: #2563eb;
         }
         .qr-placeholder {
             border: 1px dashed #93c5fd;
             background: #eff6ff;
-            border-radius: 10px;
+            border-radius: 14px;
             padding: 12px;
             text-align: center;
         }
@@ -249,7 +325,7 @@
     <!-- MAIN CONTENT -->
     <div class="main-content" style="height:100vh; min-height:0; overflow:hidden;">
         <div class="topbar d-flex justify-content-between align-items-center">
-            <h1 class="h4 m-0 fw-bold">🛒 Màn Hình Bán Hàng (POS)</h1>
+            <h1 class="h4 m-0 fw-bold"><i class="fa-solid fa-cash-register me-2 text-primary"></i>Bán hàng POS</h1>
             <button type="button" class="btn btn-primary" onclick="openQrPayment()">
                 <i class="fa-solid fa-qrcode me-2"></i>Thanh toán QR
             </button>
@@ -354,6 +430,26 @@
                         <div class="small mt-1 d-none" id="customerFeedback"></div>
                     </div>
 
+                    <div class="mb-2 d-none" id="pointsPanel">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted">Dùng điểm:</span>
+                            <span class="fw-semibold text-success" id="pointsDiscountDisplay">0 đ</span>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white">
+                                <i class="fa-solid fa-star text-warning"></i>
+                            </span>
+                            <input type="number" min="0" id="pointsInput" class="form-control"
+                                   placeholder="Số điểm muốn dùng" oninput="onPointsInput(this)">
+                            <button type="button" class="btn btn-outline-secondary" onclick="useMaxPoints()">
+                                Dùng tối đa
+                            </button>
+                        </div>
+                        <div class="small text-muted mt-1" id="pointsHint">
+                            Chọn khách hàng để xem ưu đãi điểm.
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <div class="small fw-semibold text-muted mb-2">Phương thức thanh toán</div>
                         <div class="payment-method">
@@ -389,11 +485,12 @@
                         <div id="qrReadyState">
                             <i class="fa-solid fa-qrcode text-primary fs-1 mb-2"></i>
                             <div class="fw-bold">Thanh toán QR tự động</div>
-                            <div class="small text-muted">Nhấn Thanh toán để tạo mã QR payOS theo đúng số tiền.</div>
+                            <div class="small text-muted">Chế độ kiểm thử: QR payOS sẽ tạo với số tiền 5.000đ.</div>
                         </div>
                         <div id="qrActiveState" class="d-none">
                             <div id="qrCanvas" class="bg-white p-2 border rounded mb-2"></div>
                             <div class="fw-bold text-danger fs-5" id="qrAmount">0 đ</div>
+                            <div class="small text-muted">Số tiền quét QR trong chế độ kiểm thử</div>
                             <div class="small text-muted">Mã đơn: <strong id="qrOrderCode"></strong></div>
                             <div class="small mt-1 qr-waiting" id="qrStatusText">
                                 <i class="fa-solid fa-spinner fa-spin me-1"></i>Đang chờ ngân hàng xác nhận...
@@ -474,6 +571,19 @@ let PRODUCTS = [];
 // ============================================================
 //  RENDER PRODUCTS
 // ============================================================
+function renderProductSkeleton(count = 12) {
+    const grid = document.getElementById('productGrid');
+    grid.innerHTML = Array.from({ length: count }).map(() => `
+        <div class="product-skeleton" aria-hidden="true">
+            <div class="skeleton-icon"></div>
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line full"></div>
+            <div class="skeleton-line medium"></div>
+            <div class="skeleton-line price"></div>
+        </div>
+    `).join('');
+}
+
 function renderProducts(list) {
     const grid = document.getElementById('productGrid');
     grid.innerHTML = list.map(p => {
@@ -505,6 +615,7 @@ function renderProducts(list) {
     }).join('');
 }
 async function loadProducts() {
+    renderProductSkeleton();
     try {
         const response = await fetch('<%= request.getContextPath() %>/api/products/sale');
         if (!response.ok) throw new Error('Không tải được sản phẩm.');
@@ -512,7 +623,10 @@ async function loadProducts() {
         const categories = [...new Set(PRODUCTS.map(p => p.cat))];
         const select = document.getElementById('categoryFilter');
         select.innerHTML = '<option value="">Tất cả danh mục</option>' + categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-    } catch (e) { document.getElementById('productGrid').innerHTML = `<div class="alert alert-danger">${escapeHtml(e.message)}</div>`; }
+    } catch (e) {
+        document.getElementById('productGrid').innerHTML =
+            `<div class="alert alert-danger product-load-error">${escapeHtml(e.message)}</div>`;
+    }
 }
 loadProducts();
 
@@ -523,6 +637,8 @@ let cart = {}; // { id: { ...product, qty } }
 let cartTotal = 0;       // tạm tính (subtotal trước giảm giá)
 let appliedDiscountCode = '';
 let appliedDiscountAmount = 0;
+let pointsToRedeem = 0;
+let pointsDiscountAmount = 0;
 let grandTotal = 0;      // tổng tiền sau giảm giá
 let paymentMethod = 'cash';
 let selectedCustomer = null;
@@ -564,8 +680,13 @@ ensureSecurityContext().catch(() => {});
 function onCustomerCodeInput(el) {
     el.value = el.value.toUpperCase().replace(/\s/g, '');
     selectedCustomer = null;
+    pointsToRedeem = 0;
+    pointsDiscountAmount = 0;
     el.classList.remove('is-valid', 'is-invalid');
     document.getElementById('customerFeedback').classList.add('d-none');
+    document.getElementById('pointsPanel').classList.add('d-none');
+    document.getElementById('pointsInput').value = '';
+    updateTotals();
     if (document.getElementById('discountCodeInput').value.trim()) clearAppliedDiscount(false);
 }
 
@@ -594,9 +715,17 @@ async function lookupCustomer() {
         }
         selectedCustomer = data;
         input.classList.add('is-valid');
-        feedback.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i>${data.name} · ${customerTypeLabel(data.type)} · ${data.points || 0} điểm`;
+        feedback.innerHTML =
+            `<i class="fa-solid fa-circle-check me-1"></i>${data.name}`
+            + ` · ${customerTypeLabel(data.type)}`
+            + ` · ${data.points || 0} điểm khả dụng`
+            + ` · ${data.lifetimePoints || 0} điểm tích lũy`;
         feedback.classList.add('text-success');
+        document.getElementById('pointsPanel').classList.remove('d-none');
+        document.getElementById('pointsHint').textContent =
+            `${data.points || 0} điểm có thể dùng ngay · Tổng tích lũy ${data.lifetimePoints || 0} điểm · Quy đổi 1 điểm = 100đ.`;
         if (document.getElementById('discountCodeInput').value.trim()) clearAppliedDiscount(false);
+        updateTotals();
         return true;
     } catch (error) {
         input.classList.add('is-invalid');
@@ -685,9 +814,13 @@ function clearCart(force = false) {
     document.getElementById('cashInput').classList.remove('is-invalid');
     document.getElementById('changeAmount').textContent = '0 đ';
     selectedCustomer = null;
+    pointsToRedeem = 0;
+    pointsDiscountAmount = 0;
     document.getElementById('customerCodeInput').value = '';
     document.getElementById('customerCodeInput').classList.remove('is-valid', 'is-invalid');
     document.getElementById('customerFeedback').classList.add('d-none');
+    document.getElementById('pointsPanel').classList.add('d-none');
+    document.getElementById('pointsInput').value = '';
 }
 
 function renderCart() {
@@ -728,6 +861,31 @@ function renderCart() {
     document.getElementById('subtotalAmount').textContent = fmt(cartTotal);
     if (appliedDiscountCode) clearAppliedDiscount(false);
     updateTotals();
+}
+
+function onPointsInput(el) {
+    let value = parseInt(el.value, 10) || 0;
+    value = Math.max(0, value);
+    if (!selectedCustomer) value = 0;
+    const available = selectedCustomer ? Number(selectedCustomer.points || 0) : 0;
+    const maxByAmount = Math.floor(Math.max(0, cartTotal - appliedDiscountAmount) / 100);
+    value = Math.min(value, available, maxByAmount);
+    pointsToRedeem = value;
+    el.value = value || '';
+    updateTotals();
+}
+
+function useMaxPoints() {
+    if (!selectedCustomer) {
+        storeAlert('Hãy nhập và kiểm tra mã khách hàng trước khi dùng điểm.');
+        return;
+    }
+    const input = document.getElementById('pointsInput');
+    input.value = Math.min(
+        Number(selectedCustomer.points || 0),
+        Math.floor(Math.max(0, cartTotal - appliedDiscountAmount) / 100)
+    );
+    onPointsInput(input);
 }
 
 // ============================================================
@@ -794,9 +952,20 @@ async function applyDiscountCode() {
 }
 
 function updateTotals() {
-    grandTotal = Math.max(0, cartTotal - appliedDiscountAmount);
+    const afterDiscountCode = Math.max(0, cartTotal - appliedDiscountAmount);
+    const maxPoints = selectedCustomer
+        ? Math.min(Number(selectedCustomer.points || 0), Math.floor(afterDiscountCode / 100))
+        : 0;
+    if (pointsToRedeem > maxPoints) {
+        pointsToRedeem = maxPoints;
+        document.getElementById('pointsInput').value = pointsToRedeem || '';
+    }
+    pointsDiscountAmount = pointsToRedeem * 100;
+    grandTotal = Math.max(0, afterDiscountCode - pointsDiscountAmount);
     document.getElementById('discountAmountDisplay').textContent =
         appliedDiscountAmount > 0 ? `- ${fmt(appliedDiscountAmount)}` : fmt(0);
+    document.getElementById('pointsDiscountDisplay').textContent =
+        pointsDiscountAmount > 0 ? `- ${fmt(pointsDiscountAmount)}` : fmt(0);
     document.getElementById('totalAmount').textContent = fmt(grandTotal);
 
     // Recalculate change against tổng tiền sau giảm giá
@@ -855,6 +1024,7 @@ async function submitCheckout() {
     body.set('customerCode', customerCode); body.set('paymentMethod', paymentMethod.toUpperCase());
     body.set('csrfToken', csrfToken);
     if (appliedDiscountCode) body.set('discountCode', appliedDiscountCode);
+    if (pointsToRedeem > 0) body.set('pointsToRedeem', pointsToRedeem);
     if (paymentMethod === 'cash') body.set('cashReceived', cash);
     const button = document.querySelector('.checkout-btn'); button.disabled = true;
     try {
@@ -866,7 +1036,13 @@ async function submitCheckout() {
             return;
         }
         const discountLine = result.discount > 0 ? `<br>Giảm giá: <strong class="text-success">- ${fmt(result.discount)}</strong>` : '';
-        document.getElementById('successMsg').innerHTML = `Hóa đơn <strong>${result.code}</strong> đã được lưu.${discountLine}<br>Tổng tiền: <strong class="text-danger">${fmt(result.total)}</strong>${result.change == null ? '' : `<br>Tiền thối: <strong class="text-success">${fmt(result.change)}</strong>`}`;
+        const pointLine = result.pointsRedeemed > 0
+            ? `<br>Dùng điểm: <strong class="text-success">${result.pointsRedeemed} điểm (- ${fmt(result.pointsDiscount)})</strong>`
+            : '';
+        const earnedLine = result.pointsEarned > 0
+            ? `<br>Tích điểm: <strong class="text-primary">+${result.pointsEarned} điểm</strong>`
+            : '';
+        document.getElementById('successMsg').innerHTML = `Hóa đơn <strong>${result.code}</strong> đã được lưu.${discountLine}${pointLine}${earnedLine}<br>Tổng tiền: <strong class="text-danger">${fmt(result.total)}</strong>${result.change == null ? '' : `<br>Tiền thối: <strong class="text-success">${fmt(result.change)}</strong>`}`;
         document.getElementById('printInvoiceBtn').href =
             '<%= request.getContextPath() %>/invoices/print?id=' + result.invoiceId;
         bootstrap.Modal.getOrCreateInstance(document.getElementById('successModal')).show(); clearCart(); cashEl.value=''; await loadProducts();
@@ -950,9 +1126,13 @@ function finishQrPayment(result) {
     document.getElementById('qrStatusText').classList.remove('qr-waiting');
     document.getElementById('qrStatusText').innerHTML =
         '<span class="text-success"><i class="fa-solid fa-circle-check me-1"></i>Ngân hàng đã xác nhận thanh toán.</span>';
+    const invoiceTotal = result.invoiceTotal ?? result.total;
+    const qrPaidLine = result.invoiceTotal && Number(result.invoiceTotal) !== Number(result.total)
+        ? `<br>Số tiền QR test: <strong class="text-primary">${fmt(result.total)}</strong>`
+        : '';
     document.getElementById('successMsg').innerHTML =
         `Hóa đơn <strong>${escapeHtml(result.code)}</strong> đã thanh toán qua QR.<br>`
-        + `Tổng tiền: <strong class="text-danger">${fmt(result.total)}</strong>`;
+        + `Tổng hóa đơn: <strong class="text-danger">${fmt(invoiceTotal)}</strong>${qrPaidLine}`;
     document.getElementById('printInvoiceBtn').href =
         '<%= request.getContextPath() %>/invoices/print?id=' + result.invoiceId;
     bootstrap.Modal.getOrCreateInstance(document.getElementById('successModal')).show();

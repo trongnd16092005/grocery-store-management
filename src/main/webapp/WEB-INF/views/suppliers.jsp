@@ -8,14 +8,14 @@
     <title>Quản lý nhà cung cấp</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/style.css">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/style.css?v=ui2">
 </head>
 <body>
 <div class="container-fluid p-0 d-flex">
     <%@ include file="common/sidebar.jspf" %>
     <main class="main-content">
         <div class="topbar">
-            <h1 class="h4 m-0 fw-bold"><i class="fa-solid fa-truck-field me-2"></i>Quản Lý Nhà Cung Cấp</h1>
+            <h1 class="h4 m-0 fw-bold"><i class="fa-solid fa-truck-field me-2 text-primary"></i>Quản lý nhà cung cấp</h1>
         </div>
         <div class="content">
             <c:if test="${not empty flashSuccess}">

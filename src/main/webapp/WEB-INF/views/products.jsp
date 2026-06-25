@@ -8,13 +8,13 @@
     <title>Quản lý sản phẩm</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/style.css">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/style.css?v=ui2">
 </head>
 <body>
 <div class="container-fluid p-0 d-flex"><%@ include file="common/sidebar.jspf" %>
 <main class="main-content">
     <div class="topbar d-flex justify-content-between align-items-center">
-        <div><h1 class="h4 m-0 fw-bold">📦 Quản Lý Sản Phẩm</h1><small class="text-muted">Tồn kho chỉ thay đổi tại màn hình Kho</small></div>
+        <div><h1 class="h4 m-0 fw-bold"><i class="fa-solid fa-box-open me-2 text-primary"></i>Quản lý sản phẩm</h1><small class="text-muted">Tồn kho chỉ thay đổi tại màn hình Kho</small></div>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#productModal"><i class="fa-solid fa-plus me-2"></i>Thêm sản phẩm</button>
     </div>
     <div class="content">
