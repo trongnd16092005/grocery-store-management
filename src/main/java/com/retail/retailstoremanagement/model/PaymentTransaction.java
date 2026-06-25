@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 public class PaymentTransaction extends AuditableEntity {
     private Long invoiceId;
     private String invoiceCode;
+    private BigDecimal invoiceTotalAmount;
     private long orderCode;
     private String paymentLinkId;
     private String providerReference;
@@ -21,6 +22,10 @@ public class PaymentTransaction extends AuditableEntity {
     public void setInvoiceId(Long invoiceId) { this.invoiceId = invoiceId; }
     public String getInvoiceCode() { return invoiceCode; }
     public void setInvoiceCode(String invoiceCode) { this.invoiceCode = invoiceCode; }
+    public BigDecimal getInvoiceTotalAmount() { return invoiceTotalAmount; }
+    public void setInvoiceTotalAmount(BigDecimal invoiceTotalAmount) {
+        this.invoiceTotalAmount = invoiceTotalAmount;
+    }
     public long getOrderCode() { return orderCode; }
     public void setOrderCode(long orderCode) { this.orderCode = orderCode; }
     public String getPaymentLinkId() { return paymentLinkId; }

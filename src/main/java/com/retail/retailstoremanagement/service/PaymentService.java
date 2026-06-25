@@ -7,6 +7,7 @@ import com.retail.retailstoremanagement.model.AppUser;
 import com.retail.retailstoremanagement.model.PaymentStatus;
 import com.retail.retailstoremanagement.model.PaymentTransaction;
 import com.retail.retailstoremanagement.model.Store;
+import com.retail.retailstoremanagement.config.PayOsConfig;
 import com.retail.retailstoremanagement.util.TenantContext;
 
 import java.math.BigDecimal;
@@ -31,10 +32,17 @@ public class PaymentService {
 
     public PaymentTransaction startQr(Map<String, Integer> items, String customerCode,
                                       String discountCode, AppUser cashier) throws Exception {
+        return startQr(items, customerCode, discountCode, 0, cashier);
+    }
+
+    public PaymentTransaction startQr(Map<String, Integer> items, String customerCode,
+                                      String discountCode, int pointsToRedeem,
+                                      AppUser cashier) throws Exception {
         validate(items, cashier);
         OffsetDateTime expiresAt = OffsetDateTime.now().plusMinutes(QR_EXPIRY_MINUTES);
         PaymentTransaction payment = dao.createPending(
                 items, emptyToNull(customerCode), emptyToNull(discountCode),
+                Math.max(0, pointsToRedeem), PayOsConfig.getTestAmount(),
                 cashier.getId(), expiresAt);
         try {
             long amount = payment.getAmount().longValueExact();

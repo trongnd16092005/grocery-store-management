@@ -174,6 +174,7 @@ public class JdbcCustomerDao implements CustomerDao {
         customer.setCustomerType(CustomerType.valueOf(resultSet.getString("customer_type")));
         customer.setActive(resultSet.getBoolean("active"));
         customer.setLoyaltyPoints(resultSet.getInt("loyalty_points"));
+        customer.setLifetimeLoyaltyPoints(resultSet.getInt("lifetime_loyalty_points"));
         customer.setCreatedAt(resultSet.getObject("created_at", OffsetDateTime.class));
         customer.setUpdatedAt(resultSet.getObject("updated_at", OffsetDateTime.class));
         customer.setPurchaseCount(resultSet.getLong("purchase_count"));
@@ -193,6 +194,9 @@ public class JdbcCustomerDao implements CustomerDao {
         invoice.setDiscountAmount(resultSet.getBigDecimal("discount_amount"));
         invoice.setTotalAmount(resultSet.getBigDecimal("total_amount"));
         invoice.setDiscountCode(resultSet.getString("discount_code"));
+        invoice.setPointsRedeemed(resultSet.getInt("points_redeemed"));
+        invoice.setPointsDiscountAmount(resultSet.getBigDecimal("points_discount_amount"));
+        invoice.setPointsEarned(resultSet.getInt("points_earned"));
         invoice.setCreatedAt(resultSet.getObject("created_at", OffsetDateTime.class));
         invoice.setCancelledAt(resultSet.getObject("cancelled_at", OffsetDateTime.class));
         return invoice;

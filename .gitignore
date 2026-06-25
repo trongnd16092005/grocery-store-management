@@ -3,3 +3,5 @@
 target/
 *.log
 .env
+backup/render-before-dashboard-seed-*/
+backup/render-before-loyalty-po-*/

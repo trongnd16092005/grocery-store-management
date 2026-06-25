@@ -8,14 +8,14 @@
   <title>Tài khoản</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/style.css">
+  <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/style.css?v=ui2">
 </head>
 <body>
 <div class="container-fluid p-0 d-flex">
   <%@ include file="common/sidebar.jspf" %>
   <main class="main-content">
     <div class="topbar d-flex justify-content-between align-items-center">
-      <h1 class="h4 m-0 fw-bold">${isAdmin ? '🔐 Tài khoản & phân quyền' : '🔑 Bảo mật tài khoản'}</h1>
+      <h1 class="h4 m-0 fw-bold"><i class="fa-solid ${isAdmin ? 'fa-user-shield' : 'fa-key'} me-2 text-primary"></i>${isAdmin ? 'Tài khoản & phân quyền' : 'Bảo mật tài khoản'}</h1>
       <div class="d-flex gap-2">
         <%-- Nút đổi mật khẩu — hiển thị với mọi user --%>
         <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#changePwModal">

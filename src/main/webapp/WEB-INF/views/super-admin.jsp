@@ -8,7 +8,7 @@
     <title>Quản trị hệ thống</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/style.css">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/assets/css/style.css?v=ui2">
     <style>
         .metric{border:0;border-radius:14px;box-shadow:0 4px 18px rgba(15,23,42,.06)}
         .metric-icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center}
@@ -26,7 +26,7 @@
     <%@ include file="common/sidebar.jspf" %>
     <main class="main-content">
         <div class="topbar d-flex justify-content-between align-items-center">
-            <div><h1 class="h4 m-0 fw-bold">🛡️ Quản Trị Hệ Thống</h1><small class="text-muted">Quản lý các cửa hàng sử dụng nền tảng</small></div>
+            <div><h1 class="h4 m-0 fw-bold"><i class="fa-solid fa-building-shield me-2 text-primary"></i>Quản trị hệ thống</h1><small class="text-muted">Quản lý các cửa hàng sử dụng nền tảng</small></div>
             <div class="text-end"><strong><c:out value="${sessionScope.currentUser.fullName}"/></strong><div class="small text-primary">Super Admin</div></div>
         </div>
         <div class="content">

@@ -30,6 +30,7 @@ public class PaymentStatusServlet extends HttpServlet {
             result.put("code", payment.getInvoiceCode());
             result.put("status", payment.getStatus().name());
             result.put("total", payment.getAmount());
+            result.put("invoiceTotal", payment.getInvoiceTotalAmount());
             result.put("paidAt", payment.getPaidAt() == null
                     ? null : payment.getPaidAt().toString());
             result.put("message", payment.getFailureReason());

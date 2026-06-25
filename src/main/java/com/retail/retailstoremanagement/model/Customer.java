@@ -13,6 +13,7 @@ public class Customer extends AuditableEntity {
     private CustomerType customerType = CustomerType.REGULAR;
     private boolean active = true;
     private int loyaltyPoints;
+    private int lifetimeLoyaltyPoints;
     private long purchaseCount;
     private BigDecimal totalSpent = BigDecimal.ZERO;
     private OffsetDateTime lastPurchaseAt;
@@ -87,6 +88,14 @@ public class Customer extends AuditableEntity {
 
     public void setLoyaltyPoints(int loyaltyPoints) {
         this.loyaltyPoints = loyaltyPoints;
+    }
+
+    public int getLifetimeLoyaltyPoints() {
+        return lifetimeLoyaltyPoints;
+    }
+
+    public void setLifetimeLoyaltyPoints(int lifetimeLoyaltyPoints) {
+        this.lifetimeLoyaltyPoints = lifetimeLoyaltyPoints;
     }
 
     public long getPurchaseCount() {

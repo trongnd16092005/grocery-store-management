@@ -9,7 +9,8 @@ import java.util.Map;
 
 public interface InvoiceDao {
     Invoice checkout(Map<String, Integer> items, String customerCode, PaymentMethod paymentMethod,
-                     BigDecimal cashReceived, String discountCode, Long cashierId)
+                     BigDecimal cashReceived, String discountCode, int pointsToRedeem,
+                     Long cashierId)
             throws SQLException;
     List<Invoice> findAll(String keyword, String status, int limit, int offset) throws SQLException;
     Invoice findById(long id) throws SQLException;
