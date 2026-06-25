@@ -19,7 +19,9 @@ import java.util.Set;
 import com.retail.retailstoremanagement.util.TenantContext;
 
 public class AuthFilter implements Filter {
-    private static final Set<String> PUBLIC = Set.of("/login", "/register");
+    private static final Set<String> PUBLIC =
+            Set.of("/login", "/register", "/api/payments/payos/webhook",
+                    "/payment/return", "/payment/cancel");
     private static final Set<String> ADMIN = Set.of(
             "/products", "/products.html", "/categories", "/categories.html",
             "/inventory", "/inventory.html", "/suppliers", "/store", "/purchase-orders",
@@ -42,7 +44,7 @@ public class AuthFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpServletResponse httpResponse = (HttpServletResponse) response;
         TenantContext.clear();
-        String path = httpRequest.getRequestURI().substring(httpRequest.getContextPath().length());
+        String path = httpRequest.getServletPath();
 
         if (LEGACY.containsKey(path)) {
             httpResponse.sendRedirect(httpRequest.getContextPath() + LEGACY.get(path));
@@ -83,6 +85,43 @@ public class AuthFilter implements Filter {
         }
 
         session.setAttribute("currentUser", currentUser);
+        if (currentUser.isMustChangePassword()
+                && !path.equals("/users")
+                && !path.equals("/logout")
+                && !path.equals("/common/sidebar")
+                && !path.equals("/api/session")) {
+            TenantContext.clear();
+            if (path.startsWith("/api/")) {
+                httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN,
+                        "Bạn phải đổi mật khẩu trước khi tiếp tục.");
+            } else {
+                httpResponse.sendRedirect(httpRequest.getContextPath() + "/users");
+            }
+            return;
+        }
+        if (currentUser.getRole() == UserRole.SUPER_ADMIN) {
+            boolean allowed = path.equals("/super-admin")
+                    || path.equals("/users")
+                    || path.equals("/logout")
+                    || path.equals("/common/sidebar")
+                    || path.equals("/api/session");
+            if (!allowed) {
+                TenantContext.clear();
+                if (path.startsWith("/api/")) {
+                    httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN,
+                            "Super Admin không truy cập dữ liệu nghiệp vụ cửa hàng.");
+                } else {
+                    httpResponse.sendRedirect(
+                            httpRequest.getContextPath() + "/super-admin");
+                }
+                return;
+            }
+        } else if (path.equals("/super-admin")) {
+            TenantContext.clear();
+            httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN,
+                    "Chức năng này chỉ dành cho Super Admin.");
+            return;
+        }
         if (ADMIN.contains(path) && currentUser.getRole() != UserRole.ADMIN) {
             TenantContext.clear();
             httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN,

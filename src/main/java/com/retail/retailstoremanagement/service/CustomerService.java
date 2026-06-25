@@ -3,6 +3,7 @@ package com.retail.retailstoremanagement.service;
 import com.retail.retailstoremanagement.dao.CustomerDao;
 import com.retail.retailstoremanagement.dao.impl.JdbcCustomerDao;
 import com.retail.retailstoremanagement.model.Customer;
+import com.retail.retailstoremanagement.model.Invoice;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -33,6 +34,11 @@ public class CustomerService {
             return Optional.empty();
         }
         return customerDao.findByCode(code.trim().toUpperCase());
+    }
+
+    public List<Invoice> purchaseHistory(long customerId, int limit) throws SQLException {
+        findById(customerId);
+        return customerDao.purchaseHistory(customerId, limit);
     }
 
     public Customer save(Customer customer) throws SQLException {

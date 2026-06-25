@@ -1,6 +1,7 @@
 package com.retail.retailstoremanagement.dao;
 
 import com.retail.retailstoremanagement.model.Customer;
+import com.retail.retailstoremanagement.model.Invoice;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -10,6 +11,8 @@ public interface CustomerDao extends BaseDao<Customer> {
     List<Customer> search(String keyword, String customerType) throws SQLException;
 
     Optional<Customer> findByCode(String code) throws SQLException;
+
+    List<Invoice> purchaseHistory(long customerId, int limit) throws SQLException;
 
     boolean phoneExists(String phone, Long excludedId) throws SQLException;
 }

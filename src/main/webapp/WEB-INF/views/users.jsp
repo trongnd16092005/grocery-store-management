@@ -31,6 +31,11 @@
     </div>
 
     <div class="content">
+      <c:if test="${mustChangePassword}">
+        <div class="alert alert-warning">
+          Đây là lần đăng nhập đầu tiên. Bạn phải đổi mật khẩu mặc định trước khi tiếp tục.
+        </div>
+      </c:if>
       <c:if test="${not empty flashSuccess}">
         <div class="alert alert-success alert-dismissible fade show" role="alert">
           ${flashSuccess}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -62,8 +67,8 @@
                   <td class="ps-4 fw-semibold"><c:out value="${u.fullName}"/></td>
                   <td>${u.username}</td>
                   <td>
-                    <span class="badge ${u.role=='ADMIN'?'bg-primary':'bg-info text-dark'}">
-                      ${u.role=='ADMIN'?'Quản trị viên':'Thu ngân'}
+                    <span class="badge ${u.role=='SUPER_ADMIN'?'bg-dark':u.role=='ADMIN'?'bg-primary':'bg-info text-dark'}">
+                      ${u.role=='SUPER_ADMIN'?'Super Admin':u.role=='ADMIN'?'Quản trị viên':'Thu ngân'}
                     </span>
                   </td>
                   <td>

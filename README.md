@@ -44,6 +44,9 @@ Kết nối Query Tool vào chính database `grocery_store`, sau đó chạy mig
 7. `database/migrations/V7__enforce_tenant_foreign_keys.sql`
 8. `database/migrations/V8__purchase_orders_discount_approval.sql`
 9. `database/migrations/V9__discount_codes.sql`
+10. `database/migrations/V10__super_admin.sql`
+11. `database/migrations/V11__single_super_admin.sql`
+12. `database/migrations/V12__payos_qr_payments.sql`
 
 Không chạy migration trên database mặc định `postgres`.
 
@@ -86,6 +89,10 @@ Project cũng hỗ trợ các biến môi trường tương đương:
 DB_URL=jdbc:postgresql://localhost:5432/grocery_store
 DB_USER=grocery_app
 DB_PASSWORD=<YOUR_DB_PASSWORD>
+PAYOS_CLIENT_ID=<PAYOS_CLIENT_ID>
+PAYOS_API_KEY=<PAYOS_API_KEY>
+PAYOS_CHECKSUM_KEY=<PAYOS_CHECKSUM_KEY>
+APP_BASE_URL=https://your-public-domain.example/grocery-store
 ```
 
 ## 4. Thêm artifact để deploy
@@ -136,6 +143,8 @@ Thư mục `target/` là kết quả build và không được đưa lên Git.
 
 ## Phân quyền
 
+- `SUPER_ADMIN`: quản lý danh sách cửa hàng, khóa/mở khóa cửa hàng và tự đổi mật khẩu;
+  không truy cập dữ liệu bán hàng, kho hoặc khách hàng của từng tenant.
 - `ADMIN`: dashboard, sản phẩm, danh mục, kho, tài khoản, khách hàng, bán hàng, xem và hủy hóa đơn.
 - `CASHIER`: dashboard, khách hàng, bán hàng, xem hóa đơn và tự đổi mật khẩu; không được quản lý kho hoặc hủy hóa đơn.
 
@@ -143,6 +152,14 @@ Khi tài khoản bị khóa, đổi vai trò hoặc đổi/reset mật khẩu, m
 
 ## Mô hình nhiều cửa hàng
 
+- Sau khi chạy migration V11, hệ thống chỉ có đúng một Super Admin.
+- Đăng nhập lần đầu bằng mã cửa hàng `SYSTEM`, tài khoản `admin`,
+  mật khẩu `123456`; hệ thống bắt buộc đổi mật khẩu trước khi sử dụng.
+- Không có màn hình hoặc API tạo thêm Super Admin. Database cũng chặn tạo,
+  đổi vai trò, khóa hoặc xóa tài khoản Super Admin duy nhất.
+- Trang `/super-admin` cho phép xem số ADMIN/nhân viên và khóa hoặc mở khóa cửa hàng.
+- Khi cửa hàng bị khóa, đăng nhập mới bị từ chối và các session hiện có hết hiệu lực
+  ở request tiếp theo.
 - Truy cập `/register` để tạo cửa hàng và ADMIN đầu tiên.
 - Khi đăng nhập cần nhập `mã cửa hàng`, tên đăng nhập và mật khẩu.
 - Mỗi cửa hàng có thể tạo nhiều ADMIN và CASHIER trong mục Tài khoản.
@@ -152,6 +169,44 @@ Khi tài khoản bị khóa, đổi vai trò hoặc đổi/reset mật khẩu, m
 - Dữ liệu cũ được giữ trong cửa hàng mặc định có mã `CUAHANGABC`.
 
 Thanh toán POS và hủy hóa đơn chạy trong transaction PostgreSQL, khóa bản ghi tồn kho và ghi lịch sử `SALE`/`CANCEL_SALE`.
+
+## Thanh toán QR tự động với payOS
+
+TODO sau: thêm nút **Test kết nối payOS** trong tab Setup QR và hiển thị
+trạng thái webhook đã đăng ký/chưa đăng ký để chủ cửa hàng tự kiểm tra cấu
+hình trước khi bán thật.
+
+Sau khi chạy migration V12, cấu hình các biến môi trường:
+
+```text
+PAYOS_CLIENT_ID=<client-id>
+PAYOS_API_KEY=<api-key>
+PAYOS_CHECKSUM_KEY=<checksum-key>
+APP_BASE_URL=https://your-public-domain.example/grocery-store
+```
+
+`APP_BASE_URL` phải là URL HTTPS công khai và đã bao gồm application context.
+Webhook cần đăng ký trên payOS:
+
+```text
+https://your-public-domain.example/grocery-store/api/payments/payos/webhook
+```
+
+Luồng QR:
+
+1. POS tạo hóa đơn `PENDING`, giữ tồn kho và gọi API tạo link payOS.
+2. POS hiển thị QR, số tiền và tự kiểm tra trạng thái mỗi 2,5 giây.
+3. Webhook hợp lệ chuyển hóa đơn sang `PAID`; chữ ký HMAC-SHA256, số tiền
+   và mã giao dịch đều được kiểm tra.
+4. Webhook gửi lặp không trừ kho lần thứ hai.
+5. Khi hủy, lỗi hoặc hết hạn, hàng đang giữ được hoàn lại tự động.
+6. Webhook đến sau khi giao dịch đã hủy/hết hạn được đưa vào trạng thái
+   `REVIEW`, không tự động ghi nhận bán hàng.
+
+Không đặt key payOS trong JSP, JavaScript, repository hoặc URL. Sau khi thay
+đổi key cần khởi động lại Tomcat. Cấu hình hiện tại dùng một kênh payOS chung
+cho toàn deployment; nếu mỗi cửa hàng cần tài khoản nhận tiền riêng thì phải
+bổ sung kho bí mật theo tenant.
 
 ## Xử lý lỗi thường gặp
 

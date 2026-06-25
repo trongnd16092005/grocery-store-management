@@ -33,10 +33,14 @@ public class CustomerLookupServlet extends HttpServlet {
             }
             Customer value = customer.get();
             response.getWriter().printf(
-                    "{\"found\":true,\"code\":\"%s\",\"name\":\"%s\",\"phone\":\"%s\"}",
+                    "{\"found\":true,\"code\":\"%s\",\"name\":\"%s\",\"phone\":\"%s\","
+                            + "\"type\":\"%s\",\"points\":%d,\"totalSpent\":%s}",
                     JsonUtils.escape(value.getCode()),
                     JsonUtils.escape(value.getFullName()),
-                    JsonUtils.escape(value.getPhone())
+                    JsonUtils.escape(value.getPhone()),
+                    value.getCustomerType().name(),
+                    value.getLoyaltyPoints(),
+                    value.getTotalSpent()
             );
         } catch (SQLException exception) {
             throw new ServletException("Không thể tra cứu khách hàng.", exception);

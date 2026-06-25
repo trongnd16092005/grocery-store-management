@@ -138,6 +138,41 @@ public class JdbcStoreDao implements StoreDao {
         }
     }
 
+    @Override
+    public Store updateCurrentPayOs(boolean enabled, String clientId, String apiKey,
+                                    String checksumKey) throws SQLException {
+        Store current = findCurrent();
+        String nextClientId = keepIfBlank(clientId, current.getPayOsClientId());
+        String nextApiKey = keepIfBlank(apiKey, current.getPayOsApiKey());
+        String nextChecksumKey = keepIfBlank(checksumKey, current.getPayOsChecksumKey());
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "UPDATE stores SET payos_enabled=?,payos_client_id=?,"
+                             + "payos_api_key=?,payos_checksum_key=? "
+                             + "WHERE id=current_store_id() AND active RETURNING *")) {
+            statement.setBoolean(1, enabled);
+            statement.setString(2, nextClientId);
+            statement.setString(3, nextApiKey);
+            statement.setString(4, nextChecksumKey);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) throw new SQLException("Không tìm thấy cửa hàng.");
+                return mapStore(resultSet);
+            }
+        }
+    }
+
+    @Override
+    public Store findPayOsForStoreId(long storeId) throws SQLException {
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT * FROM stores WHERE id=? AND active")) {
+            statement.setLong(1, storeId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? mapStore(resultSet) : null;
+            }
+        }
+    }
+
     private Store mapStore(ResultSet resultSet) throws SQLException {
         Store store = new Store();
         store.setId(resultSet.getLong("id"));
@@ -146,8 +181,16 @@ public class JdbcStoreDao implements StoreDao {
         store.setPhone(resultSet.getString("phone"));
         store.setAddress(resultSet.getString("address"));
         store.setActive(resultSet.getBoolean("active"));
+        store.setPayOsEnabled(resultSet.getBoolean("payos_enabled"));
+        store.setPayOsClientId(resultSet.getString("payos_client_id"));
+        store.setPayOsApiKey(resultSet.getString("payos_api_key"));
+        store.setPayOsChecksumKey(resultSet.getString("payos_checksum_key"));
         store.setCreatedAt(resultSet.getObject("created_at", OffsetDateTime.class));
         store.setUpdatedAt(resultSet.getObject("updated_at", OffsetDateTime.class));
         return store;
+    }
+
+    private String keepIfBlank(String value, String currentValue) {
+        return value == null || value.isBlank() ? currentValue : value.trim();
     }
 }

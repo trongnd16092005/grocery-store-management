@@ -11,4 +11,7 @@ public interface StoreDao {
                      String username, String passwordHash, String fullName) throws SQLException;
     Store findCurrent() throws SQLException;
     Store updateCurrent(String name, String phone, String address) throws SQLException;
+    Store updateCurrentPayOs(boolean enabled, String clientId, String apiKey,
+                             String checksumKey) throws SQLException;
+    Store findPayOsForStoreId(long storeId) throws SQLException;
 }

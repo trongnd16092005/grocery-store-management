@@ -2,5 +2,6 @@ package com.retail.retailstoremanagement.model;
 
 public enum CustomerType {
     REGULAR,
-    LOYAL
+    LOYAL,
+    VIP
 }

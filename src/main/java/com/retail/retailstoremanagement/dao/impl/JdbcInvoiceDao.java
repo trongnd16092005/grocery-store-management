@@ -23,7 +23,7 @@ public class JdbcInvoiceDao implements InvoiceDao {
         try (Connection c = DatabaseConnection.getConnection()) {
             c.setAutoCommit(false);
             try {
-                Long customerId = findCustomer(c, customerCode);
+                CustomerInfo customer = findCustomer(c, customerCode);
                 List<InvoiceDetail> details = new ArrayList<>();
                 BigDecimal subtotal = BigDecimal.ZERO;
                 for (Map.Entry<String,Integer> item : items.entrySet()) {
@@ -38,7 +38,9 @@ public class JdbcInvoiceDao implements InvoiceDao {
                             .orElseThrow(() -> new SQLException("Mã giảm giá không tồn tại."));
                     try {
                         discountAmount = discountCodeService.calculateValidDiscount(
-                                appliedCode, subtotal, OffsetDateTime.now());
+                                appliedCode, subtotal, OffsetDateTime.now(),
+                                customer == null ? null : customer.type,
+                                eligibleSubtotal(details, appliedCode));
                     } catch (RuntimeException exception) {
                         throw new SQLException(exception.getMessage(), exception);
                     }
@@ -50,7 +52,7 @@ public class JdbcInvoiceDao implements InvoiceDao {
                         throw new SQLException("Tiền khách đưa chưa đủ.");
                     change = cashReceived.subtract(total);
                 }
-                long invoiceId = insertInvoice(c, customerId, cashierId, method, subtotal,
+                long invoiceId = insertInvoice(c, customer == null ? null : customer.id, cashierId, method, subtotal,
                         discountAmount, total, method == PaymentMethod.CASH ? cashReceived : null,
                         change, appliedCode);
                 for (InvoiceDetail d : details) {
@@ -58,6 +60,7 @@ public class JdbcInvoiceDao implements InvoiceDao {
                     decreaseStock(c, d.getProductId(), d.getQuantity(), invoiceId, cashierId);
                 }
                 if (appliedCode != null) discountCodeDao.incrementUsage(c, appliedCode.getId());
+                if (customer != null) refreshCustomerLoyalty(c, customer.id);
                 c.commit();
                 return findById(invoiceId);
             } catch (Exception e) {
@@ -68,15 +71,28 @@ public class JdbcInvoiceDao implements InvoiceDao {
         }
     }
 
-    private Long findCustomer(Connection c, String code) throws SQLException {
+    private CustomerInfo findCustomer(Connection c, String code) throws SQLException {
         if (code == null) return null;
-        try (PreparedStatement s = c.prepareStatement("SELECT id FROM customers WHERE UPPER(code)=? AND active")) {
+        try (PreparedStatement s = c.prepareStatement(
+                "SELECT id,customer_type FROM customers WHERE UPPER(code)=? AND active")) {
             s.setString(1, code.toUpperCase());
             try (ResultSet r = s.executeQuery()) {
                 if (!r.next()) throw new SQLException("Không tìm thấy khách hàng " + code + ".");
-                return r.getLong(1);
+                return new CustomerInfo(r.getLong("id"),
+                        CustomerType.valueOf(r.getString("customer_type")));
             }
         }
+    }
+
+    private BigDecimal eligibleSubtotal(List<InvoiceDetail> details, DiscountCode code) {
+        if (code == null || code.getProductId() == null) return null;
+        BigDecimal total = BigDecimal.ZERO;
+        for (InvoiceDetail detail : details) {
+            if (code.getProductId().equals(detail.getProductId())) {
+                total = total.add(detail.calculateLineTotal());
+            }
+        }
+        return total;
     }
 
     private InvoiceDetail lockProduct(Connection c, String code, int quantity) throws SQLException {
@@ -150,11 +166,13 @@ public class JdbcInvoiceDao implements InvoiceDao {
 
     @Override public void cancel(long id,Long userId)throws SQLException{
         try(Connection c=DatabaseConnection.getConnection()){c.setAutoCommit(false);try{
-            Long discountCodeId=null;
-            try(PreparedStatement s=c.prepareStatement("SELECT status,discount_code_id FROM invoices WHERE id=? FOR UPDATE")){s.setLong(1,id);try(ResultSet r=s.executeQuery()){if(!r.next())throw new SQLException("Hóa đơn không tồn tại.");if(!"PAID".equals(r.getString("status")))throw new SQLException("Hóa đơn đã hủy hoặc chưa thanh toán.");long value=r.getLong("discount_code_id");discountCodeId=r.wasNull()?null:value;}}
+            Long discountCodeId=null; Long customerId=null;
+            try(PreparedStatement s=c.prepareStatement("SELECT status,discount_code_id,customer_id FROM invoices WHERE id=? FOR UPDATE")){s.setLong(1,id);try(ResultSet r=s.executeQuery()){if(!r.next())throw new SQLException("Hóa đơn không tồn tại.");if(!"PAID".equals(r.getString("status")))throw new SQLException("Hóa đơn đã hủy hoặc chưa thanh toán.");long value=r.getLong("discount_code_id");discountCodeId=r.wasNull()?null:value;value=r.getLong("customer_id");customerId=r.wasNull()?null:value;}}
             for(InvoiceDetail d:findDetails(c,id)){if(d.getProductId()==null)continue;int before;try(PreparedStatement s=c.prepareStatement("SELECT stock_quantity FROM products WHERE id=? FOR UPDATE")){s.setLong(1,d.getProductId());try(ResultSet r=s.executeQuery()){if(!r.next())continue;before=r.getInt(1);}}int after=before+d.getQuantity();try(PreparedStatement s=c.prepareStatement("UPDATE products SET stock_quantity=? WHERE id=?")){s.setInt(1,after);s.setLong(2,d.getProductId());s.executeUpdate();}insertStockLog(c,d.getProductId(),"CANCEL_SALE",d.getQuantity(),before,after,id,"Hủy hóa đơn",userId);}
             if(discountCodeId!=null){try(PreparedStatement s=c.prepareStatement("UPDATE discount_codes SET used_count=GREATEST(used_count-1,0) WHERE id=?")){s.setLong(1,discountCodeId);s.executeUpdate();}}
-            try(PreparedStatement s=c.prepareStatement("UPDATE invoices SET status='CANCELLED',cancelled_at=CURRENT_TIMESTAMP WHERE id=?")){s.setLong(1,id);s.executeUpdate();}c.commit();
+            try(PreparedStatement s=c.prepareStatement("UPDATE invoices SET status='CANCELLED',cancelled_at=CURRENT_TIMESTAMP WHERE id=?")){s.setLong(1,id);s.executeUpdate();}
+            if(customerId!=null) refreshCustomerLoyalty(c,customerId);
+            c.commit();
         }catch(Exception e){c.rollback();if(e instanceof SQLException)throw(SQLException)e;throw new SQLException(e);}finally{c.setAutoCommit(true);}}
     }
 
@@ -165,4 +183,27 @@ public class JdbcInvoiceDao implements InvoiceDao {
     private Invoice map(ResultSet r)throws SQLException{Invoice i=new Invoice();i.setId(r.getLong("id"));i.setCode(r.getString("code"));long v=r.getLong("customer_id");i.setCustomerId(r.wasNull()?null:v);v=r.getLong("cashier_id");i.setCashierId(r.wasNull()?null:v);v=r.getLong("discount_approved_by");i.setDiscountApprovedBy(r.wasNull()?null:v);v=r.getLong("discount_code_id");i.setDiscountCodeId(r.wasNull()?null:v);i.setDiscountCode(r.getString("discount_code"));i.setCustomerName(r.getString("customer_name"));i.setCashierName(r.getString("cashier_name"));i.setDiscountApproverName(r.getString("discount_approver_name"));i.setPaymentMethod(PaymentMethod.valueOf(r.getString("payment_method")));i.setStatus(InvoiceStatus.valueOf(r.getString("status")));i.setSubtotal(r.getBigDecimal("subtotal"));i.setDiscountAmount(r.getBigDecimal("discount_amount"));i.setTotalAmount(r.getBigDecimal("total_amount"));i.setCashReceived(r.getBigDecimal("cash_received"));i.setChangeAmount(r.getBigDecimal("change_amount"));i.setNote(r.getString("note"));i.setDiscountReason(r.getString("discount_reason"));i.setCreatedAt(r.getObject("created_at",OffsetDateTime.class));i.setCancelledAt(r.getObject("cancelled_at",OffsetDateTime.class));return i;}
     private void nullableLong(PreparedStatement s,int i,Long v)throws SQLException{if(v==null)s.setNull(i,Types.BIGINT);else s.setLong(i,v);}
     private void nullableDecimal(PreparedStatement s,int i,BigDecimal v)throws SQLException{if(v==null)s.setNull(i,Types.NUMERIC);else s.setBigDecimal(i,v);}
+
+    private void refreshCustomerLoyalty(Connection c, long customerId) throws SQLException {
+        try (PreparedStatement s = c.prepareStatement(
+                "WITH stats AS (SELECT COALESCE(SUM(total_amount),0) total_spent "
+                        + "FROM invoices WHERE customer_id=? AND status='PAID') "
+                        + "UPDATE customers SET loyalty_points=FLOOR(stats.total_spent/10000)::INTEGER,"
+                        + "customer_type=CASE WHEN stats.total_spent>=3000000 THEN 'VIP' "
+                        + "WHEN stats.total_spent>=500000 THEN 'LOYAL' ELSE 'REGULAR' END "
+                        + "FROM stats WHERE customers.id=?")) {
+            s.setLong(1, customerId);
+            s.setLong(2, customerId);
+            s.executeUpdate();
+        }
+    }
+
+    private static final class CustomerInfo {
+        private final long id;
+        private final CustomerType type;
+        private CustomerInfo(long id, CustomerType type) {
+            this.id = id;
+            this.type = type;
+        }
+    }
 }

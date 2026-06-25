@@ -5,5 +5,7 @@ public enum StockTransactionType {
     SALE,
     ADJUSTMENT,
     RETURN,
-    CANCEL_SALE
+    CANCEL_SALE,
+    PAYMENT_HOLD,
+    PAYMENT_RELEASE
 }

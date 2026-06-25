@@ -21,8 +21,11 @@ public class JdbcDiscountCodeDao implements DiscountCodeDao {
         List<DiscountCode> codes = new ArrayList<>();
         try (Connection connection = DatabaseConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT * FROM discount_codes WHERE (? OR active) "
-                             + "ORDER BY active DESC, created_at DESC")) {
+                     "SELECT d.*,p.code product_code,p.name product_name "
+                             + "FROM discount_codes d "
+                             + "LEFT JOIN products p ON p.id=d.product_id "
+                             + "WHERE (? OR d.active) "
+                             + "ORDER BY d.active DESC, d.created_at DESC")) {
             statement.setBoolean(1, includeInactive);
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) codes.add(map(resultSet));
@@ -35,7 +38,9 @@ public class JdbcDiscountCodeDao implements DiscountCodeDao {
     public Optional<DiscountCode> findById(long id) throws SQLException {
         try (Connection connection = DatabaseConnection.getConnection();
              PreparedStatement statement =
-                     connection.prepareStatement("SELECT * FROM discount_codes WHERE id=?")) {
+                     connection.prepareStatement("SELECT d.*,p.code product_code,p.name product_name "
+                             + "FROM discount_codes d LEFT JOIN products p ON p.id=d.product_id "
+                             + "WHERE d.id=?")) {
             statement.setLong(1, id);
             try (ResultSet resultSet = statement.executeQuery()) {
                 return resultSet.next() ? Optional.of(map(resultSet)) : Optional.empty();
@@ -58,8 +63,10 @@ public class JdbcDiscountCodeDao implements DiscountCodeDao {
 
     private Optional<DiscountCode> findByCode(Connection connection, String code, boolean lock)
             throws SQLException {
-        String sql = "SELECT * FROM discount_codes WHERE UPPER(code)=UPPER(?)"
-                + (lock ? " FOR UPDATE" : "");
+        String sql = "SELECT d.*,p.code product_code,p.name product_name "
+                + "FROM discount_codes d LEFT JOIN products p ON p.id=d.product_id "
+                + "WHERE UPPER(d.code)=UPPER(?)"
+                + (lock ? " FOR UPDATE OF d" : "");
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, code);
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -71,8 +78,9 @@ public class JdbcDiscountCodeDao implements DiscountCodeDao {
     @Override
     public DiscountCode insert(DiscountCode code) throws SQLException {
         String sql = "INSERT INTO discount_codes(code,name,discount_type,discount_value,"
-                + "minimum_order,maximum_discount,starts_at,ends_at,usage_limit,active) "
-                + "VALUES (UPPER(?),?,?,?,?,?,?,?,?,TRUE) RETURNING *";
+                + "minimum_order,maximum_discount,starts_at,ends_at,usage_limit,"
+                + "customer_type_scope,product_id,active) "
+                + "VALUES (UPPER(?),?,?,?,?,?,?,?,?,?,?,TRUE) RETURNING *";
         try (Connection connection = DatabaseConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             bind(statement, code);
@@ -87,11 +95,11 @@ public class JdbcDiscountCodeDao implements DiscountCodeDao {
     public boolean update(DiscountCode code) throws SQLException {
         String sql = "UPDATE discount_codes SET code=UPPER(?),name=?,discount_type=?,"
                 + "discount_value=?,minimum_order=?,maximum_discount=?,starts_at=?,ends_at=?,"
-                + "usage_limit=? WHERE id=?";
+                + "usage_limit=?,customer_type_scope=?,product_id=? WHERE id=?";
         try (Connection connection = DatabaseConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             bind(statement, code);
-            statement.setLong(10, code.getId());
+            statement.setLong(12, code.getId());
             return statement.executeUpdate() == 1;
         }
     }
@@ -127,6 +135,9 @@ public class JdbcDiscountCodeDao implements DiscountCodeDao {
         setNullableTimestamp(statement, 8, code.getEndsAt());
         if (code.getUsageLimit() == null) statement.setNull(9, Types.INTEGER);
         else statement.setInt(9, code.getUsageLimit());
+        statement.setString(10, code.getCustomerTypeScope() == null ? "ALL" : code.getCustomerTypeScope());
+        if (code.getProductId() == null) statement.setNull(11, Types.BIGINT);
+        else statement.setLong(11, code.getProductId());
     }
 
     private DiscountCode map(ResultSet resultSet) throws SQLException {
@@ -144,6 +155,15 @@ public class JdbcDiscountCodeDao implements DiscountCodeDao {
         code.setUsageLimit(resultSet.wasNull() ? null : usageLimit);
         code.setUsedCount(resultSet.getInt("used_count"));
         code.setActive(resultSet.getBoolean("active"));
+        code.setCustomerTypeScope(resultSet.getString("customer_type_scope"));
+        long productId = resultSet.getLong("product_id");
+        code.setProductId(resultSet.wasNull() ? null : productId);
+        try {
+            code.setProductCode(resultSet.getString("product_code"));
+            code.setProductName(resultSet.getString("product_name"));
+        } catch (SQLException ignored) {
+            // Query callers that do not join products still receive the core discount fields.
+        }
         code.setCreatedAt(resultSet.getObject("created_at", OffsetDateTime.class));
         code.setUpdatedAt(resultSet.getObject("updated_at", OffsetDateTime.class));
         return code;
@@ -159,5 +179,17 @@ public class JdbcDiscountCodeDao implements DiscountCodeDao {
                                       OffsetDateTime value) throws SQLException {
         if (value == null) statement.setNull(index, Types.TIMESTAMP_WITH_TIMEZONE);
         else statement.setObject(index, value);
+    }
+
+    public Long findProductIdByCode(String productCode) throws SQLException {
+        if (productCode == null || productCode.isBlank()) return null;
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT id FROM products WHERE UPPER(code)=UPPER(?) AND active")) {
+            statement.setString(1, productCode.trim());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? resultSet.getLong(1) : null;
+            }
+        }
     }
 }

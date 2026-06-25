@@ -1,10 +1,12 @@
 package com.retail.retailstoremanagement.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.retail.retailstoremanagement.dao.impl.JdbcInvoiceDao;
 import com.retail.retailstoremanagement.model.AppUser;
 import com.retail.retailstoremanagement.model.Invoice;
+import com.retail.retailstoremanagement.model.PaymentTransaction;
 import com.retail.retailstoremanagement.service.InvoiceService;
-import com.retail.retailstoremanagement.util.JsonUtils;
+import com.retail.retailstoremanagement.service.PaymentService;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 import java.io.IOException;
@@ -14,7 +16,9 @@ import java.util.Map;
 
 @WebServlet("/api/checkout")
 public class CheckoutServlet extends HttpServlet {
+    private static final ObjectMapper JSON = new ObjectMapper();
     private final InvoiceService service = new InvoiceService(new JdbcInvoiceDao());
+    private final PaymentService paymentService = new PaymentService();
     @Override protected void doPost(HttpServletRequest req,HttpServletResponse resp)throws IOException{
         req.setCharacterEncoding("UTF-8"); resp.setContentType("application/json;charset=UTF-8");
         try {
@@ -24,11 +28,30 @@ public class CheckoutServlet extends HttpServlet {
             for(int i=0;i<codes.length;i++)items.merge(codes[i],Integer.parseInt(quantities[i]),Integer::sum);
             String cashText=req.getParameter("cashReceived"); BigDecimal cash=cashText==null||cashText.isBlank()?null:new BigDecimal(cashText);
             AppUser user=(AppUser)req.getSession().getAttribute("currentUser");
+            if ("QR".equalsIgnoreCase(req.getParameter("paymentMethod"))) {
+                PaymentTransaction payment = paymentService.startQr(
+                        items, req.getParameter("customerCode"),
+                        req.getParameter("discountCode"), user);
+                Map<String,Object> result=new LinkedHashMap<>();
+                result.put("success",true);result.put("pending",true);
+                result.put("invoiceId",payment.getInvoiceId());
+                result.put("code",payment.getInvoiceCode());
+                result.put("orderCode",payment.getOrderCode());
+                result.put("total",payment.getAmount());
+                result.put("qrCode",payment.getQrCode());
+                result.put("checkoutUrl",payment.getCheckoutUrl());
+                result.put("expiresAt",payment.getExpiresAt().toString());
+                JSON.writeValue(resp.getWriter(),result);
+                return;
+            }
             Invoice invoice=service.checkout(items,req.getParameter("customerCode"),req.getParameter("paymentMethod"),cash,
                     req.getParameter("discountCode"),user);
-            resp.getWriter().printf("{\"success\":true,\"invoiceId\":%d,\"code\":\"%s\",\"subtotal\":%s,\"discount\":%s,\"total\":%s,\"change\":%s}",
-                    invoice.getId(),JsonUtils.escape(invoice.getCode()),invoice.getSubtotal(),invoice.getDiscountAmount(),
-                    invoice.getTotalAmount(),invoice.getChangeAmount()==null?"null":invoice.getChangeAmount());
-        } catch(Exception e){resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);resp.getWriter().print("{\"success\":false,\"message\":\""+JsonUtils.escape(e.getMessage())+"\"}");}
+            Map<String,Object> result=new LinkedHashMap<>();
+            result.put("success",true);result.put("pending",false);
+            result.put("invoiceId",invoice.getId());result.put("code",invoice.getCode());
+            result.put("subtotal",invoice.getSubtotal());result.put("discount",invoice.getDiscountAmount());
+            result.put("total",invoice.getTotalAmount());result.put("change",invoice.getChangeAmount());
+            JSON.writeValue(resp.getWriter(),result);
+        } catch(Exception e){resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);JSON.writeValue(resp.getWriter(),Map.of("success",false,"message",e.getMessage()==null?"Thanh toán thất bại.":e.getMessage()));}
     }
 }

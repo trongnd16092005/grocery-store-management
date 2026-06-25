@@ -36,15 +36,27 @@ public class StoreServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws IOException {
         try {
-            Store store = service.update(
-                    RequestUtils.text(request, "name"),
-                    RequestUtils.text(request, "phone"),
-                    RequestUtils.text(request, "address")
-            );
-            AppUser user = (AppUser) request.getSession().getAttribute("currentUser");
-            if (user != null) user.setStoreName(store.getName());
-            RequestUtils.flash(request, "flashSuccess",
-                    "Đã cập nhật thông tin cửa hàng.");
+            String action = RequestUtils.text(request, "action");
+            if ("payos".equals(action)) {
+                service.updatePayOs(
+                        "on".equalsIgnoreCase(request.getParameter("payosEnabled")),
+                        RequestUtils.text(request, "payosClientId"),
+                        RequestUtils.text(request, "payosApiKey"),
+                        RequestUtils.text(request, "payosChecksumKey")
+                );
+                RequestUtils.flash(request, "flashSuccess",
+                        "Đã cập nhật cấu hình QR payOS.");
+            } else {
+                Store store = service.update(
+                        RequestUtils.text(request, "name"),
+                        RequestUtils.text(request, "phone"),
+                        RequestUtils.text(request, "address")
+                );
+                AppUser user = (AppUser) request.getSession().getAttribute("currentUser");
+                if (user != null) user.setStoreName(store.getName());
+                RequestUtils.flash(request, "flashSuccess",
+                        "Đã cập nhật thông tin cửa hàng.");
+            }
         } catch (Exception exception) {
             String message = exception.getMessage();
             RequestUtils.flash(request, "flashError",
